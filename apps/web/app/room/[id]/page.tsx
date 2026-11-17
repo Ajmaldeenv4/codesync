@@ -2,7 +2,7 @@ import { getPrisma } from "@codesync/db";
 import { roomIdSchema } from "@codesync/shared";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getRoom, joinRoom } from "@/lib/rooms";
+import { getRoom, joinRoom, listRoomMembers } from "@/lib/rooms";
 import { getCurrentUser } from "@/lib/session";
 import { RoomView } from "./room-view";
 
@@ -31,6 +31,7 @@ async function Room({ params }: { params: Promise<{ id: string }> }) {
 
   // Anyone signed in with the link may join; this records the membership.
   await joinRoom(db, room.id, user.id);
+  const members = await listRoomMembers(db, room.id);
 
   return (
     <RoomView
@@ -40,7 +41,10 @@ async function Room({ params }: { params: Promise<{ id: string }> }) {
         language: room.language,
         isOwner: room.ownerId === user.id,
       }}
-      user={{ name: user.name, image: user.image }}
+      user={user}
+      members={members}
+      // Read at request time (not inlined at build) so deployments can point anywhere.
+      collabUrl={process.env.NEXT_PUBLIC_COLLAB_URL ?? "ws://localhost:1234"}
     />
   );
 }

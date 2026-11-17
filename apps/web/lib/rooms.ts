@@ -76,3 +76,26 @@ export async function listRecentRooms(
   });
   return rows.map(({ room, lastSeenAt }) => ({ ...room, lastSeenAt }));
 }
+
+export interface RoomMemberSummary {
+  id: string;
+  name: string;
+  image: string | null;
+}
+
+/** Everyone who has joined the room, in join order. */
+export async function listRoomMembers(
+  db: PrismaClient,
+  roomId: string,
+): Promise<RoomMemberSummary[]> {
+  const rows = await db.roomMember.findMany({
+    where: { roomId },
+    orderBy: { joinedAt: "asc" },
+    select: { user: { select: { id: true, name: true, email: true, image: true } } },
+  });
+  return rows.map(({ user }) => ({
+    id: user.id,
+    name: user.name ?? user.email ?? "Anonymous",
+    image: user.image,
+  }));
+}

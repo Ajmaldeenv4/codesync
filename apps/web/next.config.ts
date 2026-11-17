@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
+    resolveAlias: {
+      // y-monaco 0.1.6 imports Monaco's pre-0.57 deep path. monaco-editor 0.57's exports map
+      // ("./*" -> "./esm/vs/*.js") exposes the same module as "monaco-editor/editor/editor.api",
+      // so point the old specifier there. Same file, so y-monaco shares our Monaco instance.
+      "monaco-editor/esm/vs/editor/editor.api.js": "monaco-editor/editor/editor.api",
+    },
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

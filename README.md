@@ -38,4 +38,7 @@ pnpm dev                          # web :3000, collab :1234, runner :4000
 
 ```bash
 pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
+pnpm e2e    # Playwright: two browsers edit one room (starts collab + web, or reuses running ones)
 ```
+
+First time only: `pnpm --filter @codesync/e2e exec playwright install chromium`.

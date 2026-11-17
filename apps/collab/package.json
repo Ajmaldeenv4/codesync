@@ -12,12 +12,18 @@
   },
   "dependencies": {
     "@codesync/shared": "workspace:*",
-    "tsx": "catalog:"
+    "lib0": "0.2.120",
+    "tsx": "catalog:",
+    "ws": "8.23.0",
+    "y-protocols": "1.0.7",
+    "yjs": "13.6.33"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/ws": "8.18.2",
     "eslint": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "y-websocket": "3.1.0"
   }
 }

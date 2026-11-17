@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - e2e
 
 # Exact versions shared by every workspace package ("catalog:" in package.json).
 catalog:

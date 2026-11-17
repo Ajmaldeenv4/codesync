@@ -3,7 +3,7 @@ import { getPrisma, type PrismaClient } from "@codesync/db";
 import { roomIdSchema } from "@codesync/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { createRoom, getRoom, isMember, joinRoom, listRecentRooms } from "./rooms";
+import { createRoom, getRoom, isMember, joinRoom, listRecentRooms, listRoomMembers } from "./rooms";
 
 describe.skipIf(!process.env.DATABASE_URL)("rooms data layer", () => {
   let db: PrismaClient;
@@ -56,6 +56,7 @@ describe.skipIf(!process.env.DATABASE_URL)("rooms data layer", () => {
     const again = members.find((m) => m.userId === guestId);
 
     expect(members).toHaveLength(2);
+    expect((await listRoomMembers(db, room.id)).map((m) => m.name)).toEqual(["Owner", "Guest"]);
     expect(again?.joinedAt).toEqual(first.joinedAt);
     expect(again?.lastSeenAt.getTime()).toBeGreaterThan(first.lastSeenAt.getTime());
   });
