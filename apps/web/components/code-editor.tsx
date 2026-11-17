@@ -1,40 +1,13 @@
 "use client";
 
 import type { Language } from "@codesync/shared";
-import Editor, { loader } from "@monaco-editor/react";
-import * as monaco from "monaco-editor";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import Editor from "@monaco-editor/react";
+import { useEffect, useState } from "react";
 import { MonacoBinding } from "y-monaco";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
-
-// Use the bundled monaco-editor rather than the CDN copy @monaco-editor/react loads by default:
-// y-monaco imports monaco-editor directly, so both must be the same instance.
-self.MonacoEnvironment = {
-  getWorker(_workerId: string, label: string) {
-    if (label === "typescript" || label === "javascript") {
-      return new Worker(new URL("./monaco/ts.worker.ts", import.meta.url), { type: "module" });
-    }
-    return new Worker(new URL("./monaco/editor.worker.ts", import.meta.url), { type: "module" });
-  },
-};
-loader.config({ monaco });
-
-const darkQuery = "(prefers-color-scheme: dark)";
-
-function subscribeToColorScheme(onChange: () => void) {
-  const media = window.matchMedia(darkQuery);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-}
-
-function usePrefersDark() {
-  return useSyncExternalStore(
-    subscribeToColorScheme,
-    () => window.matchMedia(darkQuery).matches,
-    () => false,
-  );
-}
+import { monaco } from "./monaco-setup";
+import { usePrefersDark } from "./use-prefers-dark";
 
 export interface CodeEditorProps {
   language: Language;

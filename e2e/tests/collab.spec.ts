@@ -91,6 +91,11 @@ test("two users edit one room concurrently, converge, and see each other's curso
     bob.locator('[data-testid=member-list] li[data-online="true"]', { hasText: aliceName }),
   ).toBeVisible();
 
+  // Chat reaches the other user.
+  await alice.getByLabel("Chat message").fill("hello bob");
+  await alice.getByRole("button", { name: "Send" }).click();
+  await expect(bob.getByTestId("chat-message").filter({ hasText: "hello bob" })).toBeVisible();
+
   // When Bob leaves, Alice sees him go offline.
   await bob.context().close();
   await expect(

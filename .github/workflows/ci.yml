@@ -79,6 +79,7 @@ jobs:
         run: |
           echo "AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
           echo "WS_TOKEN_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          echo "COLLAB_INTERNAL_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
       - run: pnpm --filter @codesync/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
       - if: failure()

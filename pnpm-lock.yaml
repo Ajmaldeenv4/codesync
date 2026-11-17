@@ -211,6 +211,9 @@ importers:
 
   apps/collab:
     dependencies:
+      '@codesync/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@codesync/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -229,6 +232,9 @@ importers:
       yjs:
         specifier: 13.6.33
         version: 13.6.33
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -392,6 +398,9 @@ importers:
       jose:
         specifier: 6.2.17
         version: 6.2.17
+      yjs:
+        specifier: 13.6.33
+        version: 13.6.33
       zod:
         specifier: 4.6.7
         version: 4.6.7

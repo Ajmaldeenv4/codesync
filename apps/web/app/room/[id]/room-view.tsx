@@ -13,6 +13,8 @@ import {
   type RemotePresence,
 } from "@/lib/presence";
 import type { RoomMemberSummary } from "@/lib/rooms";
+import { ChatPanel } from "./chat-panel";
+import { HistoryDrawer, useHistoryDrawer } from "./history-drawer";
 
 // Monaco touches window at import time, so it only ever loads in the browser.
 const CodeEditor = dynamic(() => import("@/components/code-editor"), {
@@ -43,6 +45,9 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
     session.getSnapshot,
   );
 
+  const [chatOpen, setChatOpen] = useState(true);
+  const history = useHistoryDrawer(room.id);
+
   const cursorCss =
     snapshot.localClientId === null
       ? ""
@@ -62,6 +67,10 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
         <LanguageBadge language={room.language} />
         <div className="ml-auto flex items-center gap-3">
           <StatusPill status={snapshot.status} />
+          <HeaderButton onClick={history.show}>History</HeaderButton>
+          <HeaderButton onClick={() => setChatOpen((v) => !v)} pressed={chatOpen}>
+            Chat{!chatOpen && snapshot.chat.length > 0 ? ` (${snapshot.chat.length})` : ""}
+          </HeaderButton>
           <ShareButton />
         </div>
       </header>
@@ -73,14 +82,56 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
             awareness={snapshot.awareness}
           />
         </main>
-        <MemberList
-          members={members}
-          presence={snapshot.presence}
-          seenUsers={snapshot.seenUsers}
-          selfId={user.id}
-        />
+        <aside className="hidden w-72 shrink-0 flex-col border-l border-zinc-200 md:flex dark:border-zinc-800">
+          <MemberList
+            members={members}
+            presence={snapshot.presence}
+            seenUsers={snapshot.seenUsers}
+            selfId={user.id}
+          />
+          {chatOpen && (
+            <ChatPanel
+              messages={snapshot.chat}
+              selfId={user.id}
+              onSend={(text) => session.sendChat(text)}
+              disabled={snapshot.text === null}
+            />
+          )}
+        </aside>
       </div>
+      {history.open && (
+        <HistoryDrawer
+          roomId={room.id}
+          language={room.language}
+          isOwner={room.isOwner}
+          list={history.list}
+          onClose={history.hide}
+        />
+      )}
     </div>
+  );
+}
+
+function HeaderButton({
+  onClick,
+  pressed,
+  children,
+}: {
+  onClick: () => void;
+  pressed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={pressed}
+      className={`rounded-md border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900 ${
+        pressed ? "bg-zinc-100 dark:bg-zinc-900" : ""
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -144,9 +195,9 @@ function MemberList({
   );
 
   return (
-    <aside
+    <section
       aria-label="Members"
-      className="hidden w-56 shrink-0 overflow-y-auto border-l border-zinc-200 p-3 md:block dark:border-zinc-800"
+      className="max-h-56 shrink-0 overflow-y-auto border-b border-zinc-200 p-3 dark:border-zinc-800"
     >
       <h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase">
         Members · {onlineIds.size} online
@@ -170,7 +221,7 @@ function MemberList({
           </li>
         ))}
       </ul>
-    </aside>
+    </section>
   );
 }
 

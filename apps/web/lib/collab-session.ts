@@ -1,10 +1,17 @@
 // Owns one room's Yjs document and WebSocket provider for the lifetime of the room page.
 // React reads it through useSyncExternalStore; the constructor has no side effects so React's
 // Strict Mode double-mount is safe (start/stop do the work).
+import {
+  CHAT_MAX_LENGTH,
+  DOC_CHAT_KEY,
+  DOC_TEXT_KEY,
+  type ChatMessage,
+} from "@codesync/shared/doc";
 import { ROOM_TOKEN_TTL_SECONDS } from "@codesync/shared/token";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
+import { parseChat } from "./chat";
 import { colorForUser, readPresence, type PresenceUser, type RemotePresence } from "./presence";
 
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "offline";
@@ -18,6 +25,8 @@ export interface CollabSnapshot {
   localClientId: number | null;
   text: Y.Text | null;
   awareness: Awareness | null;
+  /** Chat history (stored in the same Y.Doc, so it syncs and persists with the code). */
+  chat: ChatMessage[];
 }
 
 export interface CollabSessionOptions {
@@ -36,6 +45,7 @@ const INITIAL: CollabSnapshot = {
   localClientId: null,
   text: null,
   awareness: null,
+  chat: [],
 };
 
 declare global {
@@ -50,8 +60,25 @@ export class CollabSession {
   private readonly seen = new Map<string, PresenceUser>();
   private readonly listeners = new Set<() => void>();
   private teardown: (() => void) | null = null;
+  private chatArray: Y.Array<unknown> | null = null;
 
   constructor(private readonly options: CollabSessionOptions) {}
+
+  /** Appends a chat message to the shared doc. Returns false if it can't be sent. */
+  sendChat(raw: string): boolean {
+    const text = raw.trim();
+    if (!this.chatArray || text.length === 0 || text.length > CHAT_MAX_LENGTH) return false;
+    const { user } = this.options;
+    const message: ChatMessage = {
+      id: crypto.randomUUID(),
+      userId: user.id,
+      name: user.name,
+      text,
+      ts: Date.now(),
+    };
+    this.chatArray.push([message]);
+    return true;
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -64,7 +91,11 @@ export class CollabSession {
     if (this.teardown) return;
     const { roomId, collabUrl, user } = this.options;
     const doc = new Y.Doc();
-    const text = doc.getText("monaco");
+    const text = doc.getText(DOC_TEXT_KEY);
+    const chatArray = doc.getArray<unknown>(DOC_CHAT_KEY);
+    this.chatArray = chatArray;
+    const onChat = () => this.update({ chat: parseChat(chatArray.toArray()) });
+    chatArray.observe(onChat);
     const provider = new WebsocketProvider(collabUrl, roomId, doc, {
       connect: false,
       // Always go through the server (no same-browser BroadcastChannel shortcut).
@@ -131,6 +162,8 @@ export class CollabSession {
 
     this.teardown = () => {
       disposed = true;
+      this.chatArray = null;
+      chatArray.unobserve(onChat);
       clearInterval(refreshTimer);
       window.removeEventListener("online", onNetwork);
       window.removeEventListener("offline", onNetwork);
