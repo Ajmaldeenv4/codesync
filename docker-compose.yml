@@ -1,0 +1,56 @@
+# Local dev. `pnpm dev` only needs postgres:   docker compose up -d postgres
+# Run the services in containers too:          docker compose --profile full up --build
+name: codesync
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: codesync
+      POSTGRES_PASSWORD: codesync
+      POSTGRES_DB: codesync
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codesync -d codesync"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  collab:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: apps/collab/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://codesync:codesync@postgres:5432/codesync
+      COLLAB_PORT: "1234"
+    ports:
+      - "1234:1234"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  runner:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RUNNER_PORT: "4000"
+    ports:
+      - "4000:4000"
+    volumes:
+      # The runner starts sandbox containers through the host's Docker daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:

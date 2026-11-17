@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# env: only the example is committed
+.env
+.env.*
+!.env.example
+
+# generated
+packages/db/src/generated/
+
+# test output
+playwright-report/
+test-results/

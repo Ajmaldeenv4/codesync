@@ -1,0 +1,19 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Exact versions shared by every workspace package ("catalog:" in package.json).
+catalog:
+  "@types/node": 24.19.2
+  # ESLint 9: eslint-config-next's react/jsx-a11y/import plugins don't support 10 yet.
+  eslint: 9.39.5
+  typescript: 6.0.3
+  tsx: 4.23.15
+  vitest: 5.1.0
+
+allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  sharp: false
+  unrs-resolver: false

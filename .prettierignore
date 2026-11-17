@@ -1,0 +1,12 @@
+node_modules
+pnpm-lock.yaml
+.next
+dist
+coverage
+**/generated/**
+**/migrations/**
+playwright-report
+test-results
+apps/web/next-env.d.ts
+apps/web/AGENTS.md
+codesync.md
