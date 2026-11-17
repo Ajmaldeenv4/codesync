@@ -16,6 +16,14 @@ pnpm db:migrate
 pnpm dev                          # web :3000, collab :1234, runner :4000
 ```
 
+### Signing in
+
+- **GitHub:** create an OAuth app at <https://github.com/settings/developers> with the callback
+  URL `http://localhost:3000/api/auth/callback/github`, then set `AUTH_GITHUB_ID` and
+  `AUTH_GITHUB_SECRET` in `.env`.
+- **Test users (local only):** set `AUTH_TEST_MODE=1` to get a "Sign in as test user" form that
+  signs in by name. It is ignored when `NODE_ENV=production`, and the E2E tests rely on it.
+
 ## Layout
 
 | Path              | What                                    |
