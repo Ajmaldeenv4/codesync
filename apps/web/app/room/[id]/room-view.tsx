@@ -3,7 +3,7 @@
 import type { Language } from "@codesync/shared";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import { LanguageBadge } from "@/components/language-badge";
 import { CollabSession, type ConnectionStatus } from "@/lib/collab-session";
 import {
@@ -15,6 +15,7 @@ import {
 import type { RoomMemberSummary } from "@/lib/rooms";
 import { ChatPanel } from "./chat-panel";
 import { HistoryDrawer, useHistoryDrawer } from "./history-drawer";
+import { OutputPanel, useRunner } from "./output-panel";
 
 // Monaco touches window at import time, so it only ever loads in the browser.
 const CodeEditor = dynamic(() => import("@/components/code-editor"), {
@@ -47,6 +48,25 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
 
   const [chatOpen, setChatOpen] = useState(true);
   const history = useHistoryDrawer(room.id);
+  const runner = useRunner(room.id);
+  const running = runner.state.kind === "running";
+
+  const runCode = () => {
+    if (snapshot.text) void runner.run(snapshot.text.toString());
+  };
+  // Ctrl/⌘+Enter runs the code. Capture phase, so Monaco's own Ctrl+Enter binding doesn't fire.
+  const onRunShortcut = useEffectEvent(runCode);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        onRunShortcut();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   const cursorCss =
     snapshot.localClientId === null
@@ -67,6 +87,15 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
         <LanguageBadge language={room.language} />
         <div className="ml-auto flex items-center gap-3">
           <StatusPill status={snapshot.status} />
+          <button
+            type="button"
+            onClick={runCode}
+            disabled={running || !snapshot.text}
+            title="Run (Ctrl/⌘ + Enter)"
+            className="rounded-md bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
+          >
+            {running ? "Running…" : "Run ▶"}
+          </button>
           <HeaderButton onClick={history.show}>History</HeaderButton>
           <HeaderButton onClick={() => setChatOpen((v) => !v)} pressed={chatOpen}>
             Chat{!chatOpen && snapshot.chat.length > 0 ? ` (${snapshot.chat.length})` : ""}
@@ -75,12 +104,15 @@ export function RoomView({ room, user, members, collabUrl }: RoomViewProps) {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1">
-          <CodeEditor
-            language={room.language}
-            text={snapshot.text}
-            awareness={snapshot.awareness}
-          />
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <CodeEditor
+              language={room.language}
+              text={snapshot.text}
+              awareness={snapshot.awareness}
+            />
+          </div>
+          <OutputPanel state={runner.state} stdin={runner.stdin} onStdinChange={runner.setStdin} />
         </main>
         <aside className="hidden w-72 shrink-0 flex-col border-l border-zinc-200 md:flex dark:border-zinc-800">
           <MemberList

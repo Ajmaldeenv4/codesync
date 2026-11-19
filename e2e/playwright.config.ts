@@ -31,6 +31,14 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
+      command: "pnpm --filter @codesync/runner start",
+      url: "http://localhost:4000/health",
+      cwd: "..",
+      env,
+      reuseExistingServer: !CI,
+      timeout: 60_000,
+    },
+    {
       command: "pnpm --filter @codesync/web dev",
       url: "http://localhost:3000/api/health",
       cwd: "..",

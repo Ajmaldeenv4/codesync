@@ -18,3 +18,7 @@ allowBuilds:
   prisma: true
   sharp: false
   unrs-resolver: false
+  # dockerode's optional SSH/gRPC transports; the runner talks to a local Docker socket.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
