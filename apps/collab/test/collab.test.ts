@@ -142,6 +142,20 @@ describe("connection auth", () => {
     const token = await tokenFor("room000000");
     expect(await upgradeStatus(`${running.wsUrl}/..%2F..%2Fetc?token=${token}`)).toBe(404);
   });
+
+  test("with an origin allowlist, other sites are refused even with a valid token", async () => {
+    const guarded = await startServer({ allowedOrigins: ["https://codesync.example"] });
+    try {
+      const room = nextRoom();
+      const url = `${guarded.wsUrl}/${room}?token=${await tokenFor(room)}`;
+      expect(await upgradeStatus(url, "https://codesync.example")).toBe(101);
+      expect(await upgradeStatus(url, "https://evil.example")).toBe(403);
+      // Non-browser clients send no Origin; the token is still required.
+      expect(await upgradeStatus(url)).toBe(101);
+    } finally {
+      await guarded.collab.close();
+    }
+  });
 });
 
 describe("robustness and metrics", () => {

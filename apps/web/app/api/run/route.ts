@@ -4,6 +4,9 @@ import { getRoom, isMember } from "@/lib/rooms";
 import { requestRun } from "@/lib/runner";
 import { getCurrentUser } from "@/lib/session";
 
+/** Seconds: covers waking a stopped runner plus one run. */
+export const maxDuration = 60;
+
 /** Runs the room's code in the sandbox. Members only; the language comes from the room. */
 export async function POST(request: Request) {
   const user = await getCurrentUser();

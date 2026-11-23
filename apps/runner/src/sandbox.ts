@@ -4,6 +4,7 @@ import type Docker from "dockerode";
 import { performance } from "node:perf_hooks";
 import { Writable } from "node:stream";
 import { CappedBuffer } from "./capped-buffer";
+import { isolationProblems, PROBE_CODE, type IsolationReport } from "./isolation";
 import { buildContainerSpec, IMAGES, type Limits } from "./spec";
 
 export interface SandboxRunner {
@@ -12,7 +13,7 @@ export interface SandboxRunner {
 }
 
 export class DockerSandbox implements SandboxRunner {
-  private imagesReady = false;
+  private verified = false;
 
   constructor(
     private readonly docker: Docker,
@@ -20,11 +21,15 @@ export class DockerSandbox implements SandboxRunner {
   ) {}
 
   get ready(): boolean {
-    return this.imagesReady;
+    return this.verified;
   }
 
-  /** Pulls the language images up front so the first run isn't slow. */
+  /**
+   * Gets ready to run code: waits for the Docker daemon, pulls the language images, then proves
+   * from inside a container that the limits are enforced. Throws (so `ready` stays false) if not.
+   */
   async prepare(log: (msg: string) => void = console.log): Promise<void> {
+    await this.waitForDocker();
     for (const image of new Set(Object.values(IMAGES))) {
       try {
         await this.docker.getImage(image).inspect();
@@ -38,7 +43,39 @@ export class DockerSandbox implements SandboxRunner {
         log(`pulled ${image}`);
       }
     }
-    this.imagesReady = true;
+    await this.verifyIsolation();
+    log("sandbox limits verified");
+    this.verified = true;
+  }
+
+  /** The daemon may still be starting when it shares a VM with the runner. */
+  private async waitForDocker(timeoutMs = 60_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      try {
+        await this.docker.ping();
+        return;
+      } catch (err) {
+        if (Date.now() > deadline) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+  }
+
+  private async verifyIsolation(): Promise<void> {
+    const result = await this.run("python", PROBE_CODE, "");
+    let report: IsolationReport;
+    try {
+      report = JSON.parse(result.stdout) as IsolationReport;
+    } catch {
+      throw new Error(
+        `sandbox probe produced no report (exit ${result.exit_code}): ${result.stderr}`,
+      );
+    }
+    const problems = isolationProblems(report, this.limits);
+    if (problems.length > 0) {
+      throw new Error(`sandbox is not isolated on this host: ${problems.join("; ")}`);
+    }
   }
 
   async run(language: Language, code: string, stdin: string): Promise<RunResult> {

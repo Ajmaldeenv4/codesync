@@ -18,10 +18,19 @@ const internalSecret = process.env.COLLAB_INTERNAL_SECRET || undefined;
 if (!internalSecret)
   console.warn("COLLAB_INTERNAL_SECRET is not set; history restore is disabled.");
 
+const allowedOrigins = (process.env.COLLAB_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  console.warn("COLLAB_ALLOWED_ORIGINS is not set; accepting WebSockets from any site.");
+}
+
 const port = Number(process.env.COLLAB_PORT ?? 1234);
 const collab = createCollabServer({
   tokenSecret,
   internalSecret,
+  allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : undefined,
   store: new PrismaStore(getPrisma()),
 });
 

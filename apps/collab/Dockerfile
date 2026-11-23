@@ -18,4 +18,7 @@ RUN pnpm --filter @codesync/db generate
 ENV NODE_ENV=production
 USER node
 EXPOSE 1234
-CMD ["pnpm", "--filter", "@codesync/collab", "start"]
+# node is process 1 so SIGTERM reaches it and the container waits for rooms to be saved. Started
+# through pnpm, pnpm exits on SIGTERM and the container is torn down mid-save.
+WORKDIR /repo/apps/collab
+CMD ["node", "--import", "tsx", "src/index.ts"]

@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude \"test/image/**\"",
+    "test:image": "vitest run test/image"
   },
   "dependencies": {
     "@codesync/db": "workspace:*",

@@ -12,6 +12,20 @@ export async function requestRun(
     RUNNER_URL: process.env.RUNNER_URL,
     RUNNER_HMAC_KEY: process.env.RUNNER_HMAC_KEY,
   },
+  // A stopped machine wakes on the first request and needs a few seconds to verify its sandbox.
+  wakeUp = { attempts: 10, delayMs: 2_000 },
+): Promise<RunnerResponse> {
+  for (let attempt = 1; ; attempt++) {
+    const response = await sendRun(input, env);
+    const waking = !response.ok && response.body.error === "warming_up";
+    if (!waking || attempt >= wakeUp.attempts) return response;
+    await new Promise((resolve) => setTimeout(resolve, wakeUp.delayMs));
+  }
+}
+
+async function sendRun(
+  input: { userId: string; language: Language; code: string; stdin: string },
+  env: { RUNNER_URL?: string | undefined; RUNNER_HMAC_KEY?: string | undefined },
 ): Promise<RunnerResponse> {
   const key = env.RUNNER_HMAC_KEY;
   if (!key) {

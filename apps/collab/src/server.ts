@@ -22,6 +22,11 @@ export interface CollabServerOptions {
   tokenSecret: string;
   /** Authenticates web -> collab internal calls (history restore). Internal API is off without it. */
   internalSecret?: string;
+  /**
+   * Web origins allowed to open a WebSocket. Unset allows any (local dev). Browsers always send
+   * Origin, so this stops other sites from using a visitor's token; it is not the main check.
+   */
+  allowedOrigins?: string[];
   /** Where documents are persisted. Defaults to an in-memory store (tests, no database). */
   store?: DocStore;
   persistence?: PersistenceOptions;
@@ -46,6 +51,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   const {
     tokenSecret,
     internalSecret,
+    allowedOrigins,
     store = new MemoryStore(),
     pingIntervalMs = 30_000,
     maxPayloadBytes = 5 * 1024 * 1024,
@@ -140,6 +146,10 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   });
 
   async function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    const { origin } = req.headers;
+    if (allowedOrigins && origin !== undefined && !allowedOrigins.includes(origin)) {
+      return reject(socket, 403);
+    }
     // y-websocket connects to `${serverUrl}/${roomId}?token=...`.
     const url = new URL(req.url ?? "/", "http://collab.invalid");
     const roomId = decodeURIComponent(url.pathname.slice(1));

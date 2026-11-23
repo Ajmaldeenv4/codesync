@@ -1,0 +1,22 @@
+# The runner plus its own Docker daemon, for a host that is already a VM (Fly Machines).
+# Build from the repo root: docker build -f apps/runner/Dockerfile.fly .
+FROM node:24-alpine AS app
+RUN npm install -g pnpm@12.21.0
+WORKDIR /repo
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/runner/package.json apps/runner/
+RUN pnpm install --frozen-lockfile --filter @codesync/runner...
+COPY packages/shared packages/shared
+COPY apps/runner apps/runner
+
+FROM docker:29-dind
+RUN apk add --no-cache libstdc++
+COPY --from=app /usr/local/bin/node /usr/local/bin/node
+COPY --from=app /repo /repo
+COPY --chmod=755 apps/runner/fly-entrypoint.sh /usr/local/bin/codesync-runner
+ENV NODE_ENV=production
+WORKDIR /repo/apps/runner
+EXPOSE 4000
+# docker-init reaps orphaned processes left behind by containers.
+ENTRYPOINT ["docker-init", "-s", "--", "codesync-runner"]

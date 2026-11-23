@@ -14,4 +14,6 @@ COPY apps/runner apps/runner
 ENV NODE_ENV=production
 # Runs as root for now: it needs the mounted Docker socket. Revisited in Phase 4.
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@codesync/runner", "start"]
+# node is process 1 so it receives SIGTERM directly.
+WORKDIR /repo/apps/runner
+CMD ["node", "--import", "tsx", "src/index.ts"]

@@ -53,6 +53,25 @@ describe("requestRun", () => {
     expect(await requestRun(input, env)).toMatchObject({ ok: false, status: 502 });
   });
 
+  test("waits for a waking runner, but not forever", async () => {
+    const result = { stdout: "hi", stderr: "", exit_code: 0, duration_ms: 1 };
+    const waking = () => Response.json({ error: "warming_up" }, { status: 503 });
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => waking())
+      .mockImplementationOnce(async () => Response.json(result));
+    vi.stubGlobal("fetch", fetchMock);
+    const woken = await requestRun(input, env, { attempts: 5, delayMs: 1 });
+    expect(woken).toMatchObject({ ok: true, result });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const never = vi.fn(async () => waking());
+    vi.stubGlobal("fetch", never);
+    const gaveUp = await requestRun(input, env, { attempts: 3, delayMs: 1 });
+    expect(gaveUp).toMatchObject({ ok: false, status: 503 });
+    expect(never).toHaveBeenCalledTimes(3);
+  });
+
   test("an unreachable runner is a 502, a missing key a 500", async () => {
     vi.stubGlobal(
       "fetch",

@@ -1,0 +1,37 @@
+# Collaboration server. Deploy from the repo root: see docs/DEPLOY.md
+# App names are global on Fly; change this if it is taken.
+app = "codesync-collab"
+primary_region = "iad"
+# SIGTERM makes the server save every open room; allow time for that.
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Rooms live in one process's memory, so two versions must never run side by side.
+  strategy = "immediate"
+  release_command = "pnpm --dir /repo --filter @codesync/db migrate:deploy"
+
+[env]
+  COLLAB_PORT = "1234"
+
+[http_service]
+  internal_port = 1234
+  force_https = true
+  # Exactly one machine, always on. Deploy with --ha=false.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

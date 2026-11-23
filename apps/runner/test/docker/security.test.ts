@@ -85,6 +85,36 @@ describe.skipIf(!dockerAvailable)("sandbox security", () => {
   );
 
   test(
+    "a program cannot start more than 64 processes",
+    async () => {
+      const result = await sandbox.run(
+        "python",
+        [
+          "import os, signal, time",
+          "pids = []",
+          "try:",
+          "    for _ in range(500):",
+          "        pid = os.fork()",
+          "        if pid == 0:",
+          "            time.sleep(30)",
+          "            os._exit(0)",
+          "        pids.append(pid)",
+          "    print('unlimited', len(pids))",
+          "except OSError:",
+          "    print('stopped', len(pids))",
+          "for pid in pids:",
+          "    os.kill(pid, signal.SIGKILL)",
+        ].join("\n"),
+        "",
+      );
+      const [outcome, count] = result.stdout.trim().split(" ");
+      expect(outcome).toBe("stopped");
+      expect(Number(count)).toBeLessThan(RUN_LIMITS.pids);
+    },
+    RUN_TIMEOUT_MS,
+  );
+
+  test(
     "a memory bomb is OOM-killed at 128 MB",
     async () => {
       const result = await sandbox.run(

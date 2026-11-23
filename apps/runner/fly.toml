@@ -1,0 +1,37 @@
+# Sandbox runner. Deploy from the repo root: see docs/DEPLOY.md
+# App names are global on Fly; change this if it is taken.
+app = "codesync-runner"
+primary_region = "iad"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  RUNNER_PORT = "4000"
+  RUNNER_MAX_CONCURRENCY = "2"
+
+# Reachable from Vercel over HTTPS. Every /run request must carry a valid HMAC signature.
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+# Pulled images live here so a restarted machine doesn't download them again.
+[[mounts]]
+  source = "runner_docker"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"

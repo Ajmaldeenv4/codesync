@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import WebSocket from "ws";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
-import { createCollabServer, type CollabServer } from "../src/server";
+import { createCollabServer, type CollabServer, type CollabServerOptions } from "../src/server";
 
 export const SECRET = "collab-test-secret-that-is-long-enough-123";
 
@@ -13,8 +13,14 @@ export interface RunningServer {
   wsUrl: string;
 }
 
-export async function startServer(): Promise<RunningServer> {
-  const collab = createCollabServer({ tokenSecret: SECRET, pingIntervalMs: 60_000 });
+export async function startServer(
+  options: Partial<CollabServerOptions> = {},
+): Promise<RunningServer> {
+  const collab = createCollabServer({
+    tokenSecret: SECRET,
+    pingIntervalMs: 60_000,
+    ...options,
+  });
   await new Promise<void>((resolve) => collab.server.listen(0, "127.0.0.1", resolve));
   const { port } = collab.server.address() as AddressInfo;
   return { collab, httpUrl: `http://127.0.0.1:${port}`, wsUrl: `ws://127.0.0.1:${port}` };
@@ -53,9 +59,9 @@ export async function waitFor(check: () => boolean, what: string, timeoutMs = 50
 }
 
 /** Opens a raw socket and resolves with the HTTP status of the rejected upgrade (or 101). */
-export function upgradeStatus(url: string): Promise<number> {
+export function upgradeStatus(url: string, origin?: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, { origin });
     ws.on("unexpected-response", (_req, res) => {
       resolve(res.statusCode ?? 0);
       ws.terminate();
