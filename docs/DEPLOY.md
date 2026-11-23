@@ -1,21 +1,17 @@
 # Deploying CodeSync
 
-Three pieces plus a database: the web app on Vercel, the collab server and the runner on Fly.io,
-and Postgres on Neon. Run every command from the repo root.
+Free setup: the web app on Vercel, the collab server on Render and Postgres on Neon, all on free
+plans and all in Singapore. Run every command from the repo root.
 
-You need accounts on GitHub, Vercel, Fly.io (with a payment method) and Neon. Vercel and Neon have
-free plans. On Fly, both machines sleep when idle, so a demo should use well under the $5 a month
-its Free plan includes with a card on file. That is an allowance, not a cap: if a month goes over
-$5, Fly bills the whole month from the first cent.
-
-App names on Fly are global. If `codesync-collab` or `codesync-runner` is taken, change `app` in
-`apps/collab/fly.toml` / `apps/runner/fly.toml` and use your names below.
+The runner needs a machine that can run Docker, which no free plan here offers. Without it the site
+works except for the Run button, which says the sandbox is unreachable. To add it, use Fly.io (step
+4), which needs a card, or any small VPS.
 
 ## 1. Database (Neon)
 
-Create a project in the region closest to Fly's `iad` (US East). Copy two connection strings:
+Create a project in Singapore. Copy two connection strings:
 
-- **Direct** (host without `-pooler`): for the collab server, which also runs migrations.
+- **Direct** (host without `-pooler`): for the collab server and for migrations.
 - **Pooled** (host with `-pooler`): for Vercel, whose functions open many short connections.
 
 ## 2. Shared secrets
@@ -29,7 +25,27 @@ Generate four values with `openssl rand -base64 32`. Each must be identical wher
 | `RUNNER_HMAC_KEY`        |        |  yes   |  yes   |
 | `AUTH_SECRET`            |        |        |  yes   |
 
-## 3. Collab server (Fly)
+## 3. Collab server (Render)
+
+Create the tables first (Render's free plan can't run migrations). Put the direct URL in
+`.env.deploy.collab` (git-ignored), then:
+
+```bash
+node --env-file=.env.deploy.collab packages/db/node_modules/prisma/build/index.js migrate deploy --config packages/db/prisma.config.ts
+```
+
+In Render choose **New > Blueprint**, pick this repository, and paste the four values it asks for.
+`COLLAB_ALLOWED_ORIGINS` is your Vercel address. Then open `https://<service>.onrender.com/health`.
+
+The free plan sleeps after 15 minutes without traffic and takes about a minute to wake. Deploys
+start the new server before stopping the old one; both may serve the same room for a moment
+without losing edits.
+
+### Alternative: Fly
+
+Needs a card. Both machines sleep when idle, so a demo should use well under the $5 a month Fly's
+Free plan includes. That is an allowance, not a cap: if a month goes over $5, Fly bills the whole
+month from the first cent. App names are global; if one is taken, change `app` in its `fly.toml`.
 
 ```bash
 flyctl auth login
@@ -87,26 +103,20 @@ Import the GitHub repository in Vercel and set:
 | `DATABASE_URL`                         | Neon pooled URL                    |
 | `AUTH_SECRET`                          | from step 2                        |
 | `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET` | from step 5                        |
-| `NEXT_PUBLIC_COLLAB_URL`               | `wss://codesync-collab.fly.dev`    |
+| `NEXT_PUBLIC_COLLAB_URL`               | `wss://<service>.onrender.com`     |
 | `WS_TOKEN_SECRET`                      | from step 2                        |
 | `COLLAB_INTERNAL_SECRET`               | from step 2                        |
-| `RUNNER_URL`                           | `https://codesync-runner.fly.dev`  |
+| `RUNNER_URL`                           | the runner, or leave empty         |
 | `RUNNER_HMAC_KEY`                      | from step 2                        |
 | `ENABLE_EXPERIMENTAL_COREPACK`         | `1` (uses the pinned pnpm version) |
 
 Do not set `AUTH_TEST_MODE`. Vercel is trusted by Auth.js automatically, so `AUTH_TRUST_HOST` is
 only needed if you host the web app elsewhere.
 
-## 7. Lock the collab server to your site
-
-```bash
-flyctl secrets set --app codesync-collab COLLAB_ALLOWED_ORIGINS="https://<your-app>.vercel.app"
-```
-
-## 8. Check it
+## 7. Check it
 
 1. Sign in with GitHub on two devices on different networks (for example a laptop on Wi-Fi and a
    phone on mobile data) and open the same room.
 2. Type on both; each sees the other's text and cursor.
-3. Run some code.
-4. Run `flyctl deploy` for collab again while a room is open. The room reconnects with nothing lost.
+3. Run some code (if you deployed the runner).
+4. Redeploy the collab server while a room is open. The room reconnects with nothing lost.

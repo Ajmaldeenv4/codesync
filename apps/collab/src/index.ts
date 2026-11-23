@@ -26,7 +26,8 @@ if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn("COLLAB_ALLOWED_ORIGINS is not set; accepting WebSockets from any site.");
 }
 
-const port = Number(process.env.COLLAB_PORT ?? 1234);
+// PORT is what hosts such as Render set.
+const port = Number(process.env.COLLAB_PORT ?? process.env.PORT ?? 1234);
 const collab = createCollabServer({
   tokenSecret,
   internalSecret,

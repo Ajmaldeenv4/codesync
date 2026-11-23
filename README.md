@@ -102,7 +102,7 @@ are rate limited per user. Chat saved to the database is attributed to the verif
 what the browser claims.
 
 Containers share the host's kernel, so a kernel exploit could escape one. The runner should have a
-machine to itself, which is how it is configured for Fly.io.
+machine to itself.
 
 ## Measured results
 
@@ -112,14 +112,14 @@ included**.
 
 | Metric                                                 | Result       |
 | ------------------------------------------------------ | ------------ |
-| Edit in A to visible in B, p50 / p95                   | 0.6 / 0.9 ms |
+| Edit in A to visible in B, p50 / p95                   | 0.6 / 1.0 ms |
 | 200 clients in one room, lost edits                    | 0 of 39,800  |
 | 200 clients in one room, dropped connections           | 0            |
-| 200 clients, edit to visible everywhere, p50 / p95     | 3.4 / 7.8 ms |
-| `kill -9`, restart to first synced document, p50 / p95 | 624 / 668 ms |
+| 200 clients, edit to visible everywhere, p50 / p95     | 3.6 / 8.3 ms |
+| `kill -9`, restart to first synced document, p50 / p95 | 607 / 664 ms |
 | Documents intact after `kill -9`                       | 10 of 10     |
-| JavaScript run, request to result, p50 / p95           | 314 / 394 ms |
-| Python run, request to result, p50 / p95               | 263 / 283 ms |
+| JavaScript run, request to result, p50 / p95           | 288 / 346 ms |
+| Python run, request to result, p50 / p95               | 274 / 315 ms |
 | Sandbox security tests passed                          | 10 of 10     |
 
 ## Tests
@@ -139,12 +139,14 @@ CI runs the checks, the E2E tests, the security suite, and tests of the images t
 
 ## Known limitations
 
-- **One collab process.** Rooms live in its memory, so it cannot be scaled to several machines.
+- **One collab process.** Rooms live in its memory, so people on two servers would not see each
+  other live. Overlap during a deploy is safe: nothing is lost and browsers reconnect.
 - **Up to 500 ms of edits can be lost on the server** if it is killed without warning. Connected
   browsers still hold them and send them again when they reconnect.
 - **Presence names are self-reported.** A modified client could show a false name on its cursor.
-- **The runner on Fly.io is unproven.** Its nested Docker works in a privileged container; Fly does
-  not document it. The fallback is a small VPS, described in the deploy guide.
+- **No free host for the runner.** It needs Docker, so Run is off on the free deployment. The Fly.io
+  setup is written but unproven: its nested Docker works in a privileged container, and Fly does
+  not document it. A small VPS works too.
 - **GitHub sign-in** is configured but has not been exercised end to end; tests use test users.
 - Auth.js v5 is still a beta release.
 - The chat panel and member list are hidden on narrow screens.

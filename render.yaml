@@ -1,0 +1,23 @@
+# Collaboration server on Render's free plan. Create it with New > Blueprint; see docs/DEPLOY.md
+services:
+  - type: web
+    name: codesync-collab
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./apps/collab/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: "10000"
+      # Asked for once, when the Blueprint is created.
+      - key: DATABASE_URL
+        sync: false
+      - key: WS_TOKEN_SECRET
+        sync: false
+      - key: COLLAB_INTERNAL_SECRET
+        sync: false
+      - key: COLLAB_ALLOWED_ORIGINS
+        sync: false

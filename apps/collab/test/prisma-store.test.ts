@@ -23,18 +23,22 @@ describe.skipIf(!hasDatabase)("PrismaStore (Postgres)", () => {
     doc.getText("monaco").insert(0, "print(1)");
     doc.getText("monaco").insert(8, "\nprint(2)");
 
-    await store.appendUpdate(roomId, 1, updates[0] as Uint8Array);
-    await store.appendUpdate(roomId, 1, updates[0] as Uint8Array); // retry: idempotent
-    await store.appendUpdate(roomId, 2, updates[1] as Uint8Array);
+    // Concurrent writers get distinct sequence numbers; a repeated write is harmless.
+    await Promise.all([
+      store.appendUpdate(roomId, updates[0] as Uint8Array),
+      store.appendUpdate(roomId, updates[0] as Uint8Array),
+      store.appendUpdate(roomId, updates[1] as Uint8Array),
+    ]);
     let loaded = await store.load(roomId);
     expect(loaded.snapshot).toBeNull();
-    expect(loaded.updates.map((u) => u.seq)).toEqual([1, 2]);
+    expect(loaded.updates.map((u) => u.seq)).toEqual([1, 2, 3]);
 
-    const version = await store.compact(roomId, Y.encodeStateAsUpdate(doc), 1);
+    // A server that has seen nothing compacts: the stored updates must end up in the snapshot.
+    const version = await store.compact(roomId, Y.encodeStateAsUpdate(new Y.Doc()));
     expect(version).toBe(1);
     loaded = await store.load(roomId);
     expect(loaded.snapshot?.version).toBe(1);
-    expect(loaded.updates.map((u) => u.seq)).toEqual([2]); // only rows after the snapshot
+    expect(loaded.updates).toEqual([]);
 
     const restored = new Y.Doc();
     Y.applyUpdate(restored, (loaded.snapshot as { state: Uint8Array }).state);
@@ -47,7 +51,7 @@ describe.skipIf(!hasDatabase)("PrismaStore (Postgres)", () => {
 
   test("snapshot versions increase", async () => {
     const state = Y.encodeStateAsUpdate(new Y.Doc());
-    const next = await store.compact(fixture.roomId, state, 0);
+    const next = await store.compact(fixture.roomId, state);
     expect(next).toBeGreaterThan(1);
   });
 

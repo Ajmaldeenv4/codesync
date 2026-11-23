@@ -99,6 +99,32 @@ describe("compaction", () => {
 });
 
 describe("failures", () => {
+  test("a write that landed but reported failure doesn't lose what is typed next", async () => {
+    const store = new MemoryStore();
+    const original = store.appendUpdate.bind(store);
+    let lostConfirmations = 1;
+    vi.spyOn(store, "appendUpdate").mockImplementation(async (...args) => {
+      await original(...args);
+      if (lostConfirmations-- > 0) throw new Error("connection dropped after commit");
+    });
+
+    const { text, persistence } = await setup(store);
+    text.insert(0, "first ");
+    await persistence.flush(); // stored, but reported as failed and queued again
+    text.insert(6, "second");
+    await persistence.flush();
+    expect(await reload(store)).toBe("first second");
+  });
+
+  test("shutdown saves edits whose last write failed", async () => {
+    const store = new MemoryStore();
+    vi.spyOn(store, "appendUpdate").mockRejectedValue(new Error("db down"));
+    const { text, persistence } = await setup(store);
+    text.insert(0, "not written yet");
+    await persistence.close();
+    expect(await reload(store)).toBe("not written yet");
+  });
+
   test("a failed write is retried and nothing is lost", async () => {
     const store = new MemoryStore();
     const original = store.appendUpdate.bind(store);

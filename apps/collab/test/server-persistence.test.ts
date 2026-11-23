@@ -110,7 +110,7 @@ describe("internal restore", () => {
     // Version 1 of the room holds "old code".
     const v1 = new Y.Doc();
     v1.getText("monaco").insert(0, "old code");
-    await store.compact(room, Y.encodeStateAsUpdate(v1), 0);
+    await store.compact(room, Y.encodeStateAsUpdate(v1));
 
     const ada = await client(room);
     ada.text.insert(0, "new code, ");

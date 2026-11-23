@@ -33,7 +33,6 @@ export class RoomPersistence {
     private readonly roomId: string,
     private readonly store: DocStore,
     private readonly doc: Y.Doc,
-    private lastSeq: number,
     private rowsSinceSnapshot: number,
     options: PersistenceOptions,
   ) {
@@ -54,8 +53,7 @@ export class RoomPersistence {
     const { snapshot, updates } = await store.load(roomId);
     if (snapshot) Y.applyUpdate(doc, snapshot.state, LOAD_ORIGIN);
     for (const { update } of updates) Y.applyUpdate(doc, update, LOAD_ORIGIN);
-    const lastSeq = updates.reduce((max, u) => Math.max(max, u.seq), 0);
-    return new RoomPersistence(roomId, store, doc, lastSeq, updates.length, options);
+    return new RoomPersistence(roomId, store, doc, updates.length, options);
   }
 
   /** Number of rows written since the last snapshot (for tests and metrics). */
@@ -99,26 +97,25 @@ export class RoomPersistence {
   }
 
   private async write(update: Uint8Array): Promise<void> {
-    const seq = this.lastSeq + 1;
     try {
-      await this.store.appendUpdate(this.roomId, seq, update);
+      await this.store.appendUpdate(this.roomId, update);
     } catch (err) {
       this.onError(err, this.roomId);
-      // Keep the data: put it back at the front of the queue and try again later. Yjs updates
-      // are idempotent, so a write that did land and is retried under a new seq is harmless.
+      // Keep the data: put it back at the front of the queue and try again later. If the write
+      // did land and only its confirmation was lost, storing it twice is harmless.
       this.pending.unshift(update);
       if (!this.closed) this.timer ??= setTimeout(() => void this.flush(), this.retryMs);
       return;
     }
-    this.lastSeq = seq;
     this.rowsSinceSnapshot += 1;
     if (this.rowsSinceSnapshot >= this.compactEvery) await this.compactNow();
   }
 
   private async compactNow(): Promise<void> {
-    if (this.rowsSinceSnapshot === 0) return;
+    // Updates still pending here are ones whose write failed; a snapshot saves them too.
+    if (this.rowsSinceSnapshot === 0 && this.pending.length === 0) return;
     try {
-      await this.store.compact(this.roomId, Y.encodeStateAsUpdate(this.doc), this.lastSeq);
+      await this.store.compact(this.roomId, Y.encodeStateAsUpdate(this.doc));
       this.rowsSinceSnapshot = 0;
     } catch (err) {
       // The rows are still there, so nothing is lost; the next compaction retries.

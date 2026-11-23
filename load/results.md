@@ -9,17 +9,17 @@ top and is not included.
 
 | Metric                                                                            | Result             |
 | --------------------------------------------------------------------------------- | ------------------ |
-| Sync latency, edit in A to visible in B, p50 / p95 (500 edits)                    | 0.6 / 0.9 ms       |
+| Sync latency, edit in A to visible in B, p50 / p95 (500 edits)                    | 0.6 / 1 ms         |
 | 50 clients in one room: lost edits, dropped connections, identical text           | 0 of 9800, 0, yes  |
-| 50 clients: edit to visible everywhere, p50 / p95                                 | 1.4 / 2.7 ms       |
+| 50 clients: edit to visible everywhere, p50 / p95                                 | 1.5 / 3.2 ms       |
 | 100 clients in one room: lost edits, dropped connections, identical text          | 0 of 19800, 0, yes |
-| 100 clients: edit to visible everywhere, p50 / p95                                | 2 / 3.9 ms         |
+| 100 clients: edit to visible everywhere, p50 / p95                                | 2.4 / 5.5 ms       |
 | 200 clients in one room: lost edits, dropped connections, identical text          | 0 of 39800, 0, yes |
-| 200 clients: edit to visible everywhere, p50 / p95                                | 3.4 / 7.8 ms       |
-| Recovery after kill -9: restart to first synced document, p50 / p95 (10 restarts) | 624.2 / 667.6 ms   |
+| 200 clients: edit to visible everywhere, p50 / p95                                | 3.6 / 8.3 ms       |
+| Recovery after kill -9: restart to first synced document, p50 / p95 (10 restarts) | 607.1 / 664.3 ms   |
 | Documents intact after kill -9                                                    | 10 of 10           |
-| javascript sandbox run, request to result, p50 / p95 (100 runs, 0 failed)         | 314 / 394.1 ms     |
-| python sandbox run, request to result, p50 / p95 (100 runs, 0 failed)             | 263.4 / 283.4 ms   |
+| javascript sandbox run, request to result, p50 / p95 (100 runs, 0 failed)         | 288.3 / 346.2 ms   |
+| python sandbox run, request to result, p50 / p95 (100 runs, 0 failed)             | 273.9 / 315.2 ms   |
 | Sandbox security tests passed                                                     | 10 of 10           |
 
 ## How each number is measured
