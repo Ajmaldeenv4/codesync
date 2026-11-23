@@ -30,10 +30,10 @@ Generate four values with `openssl rand -base64 32`. Each must be identical wher
 ## 3. Collab server (Fly)
 
 ```bash
-fly auth login
-fly apps create codesync-collab
-fly secrets set --app codesync-collab DATABASE_URL="<neon direct url>" WS_TOKEN_SECRET="..." COLLAB_INTERNAL_SECRET="..."
-fly deploy . --config apps/collab/fly.toml --dockerfile apps/collab/Dockerfile --ha=false
+flyctl auth login
+flyctl apps create codesync-collab
+flyctl secrets set --app codesync-collab DATABASE_URL="<neon direct url>" WS_TOKEN_SECRET="..." COLLAB_INTERNAL_SECRET="..."
+flyctl deploy . --config apps/collab/fly.toml --dockerfile apps/collab/Dockerfile --ha=false
 curl https://codesync-collab.fly.dev/health
 ```
 
@@ -43,10 +43,10 @@ Migrations run before each release.
 ## 4. Runner (Fly)
 
 ```bash
-fly apps create codesync-runner
-fly volumes create runner_docker --app codesync-runner --region iad --size 5
-fly secrets set --app codesync-runner RUNNER_HMAC_KEY="..."
-fly deploy . --config apps/runner/fly.toml --dockerfile apps/runner/Dockerfile.fly --ha=false
+flyctl apps create codesync-runner
+flyctl volumes create runner_docker --app codesync-runner --region iad --size 5
+flyctl secrets set --app codesync-runner RUNNER_HMAC_KEY="..."
+flyctl deploy . --config apps/runner/fly.toml --dockerfile apps/runner/Dockerfile.fly --ha=false
 curl https://codesync-runner.fly.dev/health
 ```
 
@@ -98,7 +98,7 @@ only needed if you host the web app elsewhere.
 ## 7. Lock the collab server to your site
 
 ```bash
-fly secrets set --app codesync-collab COLLAB_ALLOWED_ORIGINS="https://<your-app>.vercel.app"
+flyctl secrets set --app codesync-collab COLLAB_ALLOWED_ORIGINS="https://<your-app>.vercel.app"
 ```
 
 ## 8. Check it
@@ -107,4 +107,4 @@ fly secrets set --app codesync-collab COLLAB_ALLOWED_ORIGINS="https://<your-app>
    phone on mobile data) and open the same room.
 2. Type on both; each sees the other's text and cursor.
 3. Run some code.
-4. Run `fly deploy` for collab again while a room is open. The room reconnects with nothing lost.
+4. Run `flyctl deploy` for collab again while a room is open. The room reconnects with nothing lost.
