@@ -1,0 +1,110 @@
+{
+  "machine": {
+    "os": "Windows_NT 10.0.26200",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700HX (24 threads)",
+    "memoryGb": 16,
+    "node": "v26.13.0",
+    "date": "2026-11-23"
+  },
+  "latency": {
+    "count": 500,
+    "p50": 0.6,
+    "p95": 0.9,
+    "max": 2.7
+  },
+  "rooms": [
+    {
+      "clients": 50,
+      "connected": 50,
+      "edits": 200,
+      "deliveries": 9800,
+      "lost": 0,
+      "disconnects": 0,
+      "converged": true,
+      "latency": {
+        "count": 9800,
+        "p50": 1.4,
+        "p95": 2.7,
+        "max": 7.1
+      }
+    },
+    {
+      "clients": 100,
+      "connected": 100,
+      "edits": 200,
+      "deliveries": 19800,
+      "lost": 0,
+      "disconnects": 0,
+      "converged": true,
+      "latency": {
+        "count": 19800,
+        "p50": 2,
+        "p95": 3.9,
+        "max": 8.8
+      }
+    },
+    {
+      "clients": 200,
+      "connected": 200,
+      "edits": 200,
+      "deliveries": 39800,
+      "lost": 0,
+      "disconnects": 0,
+      "converged": true,
+      "latency": {
+        "count": 39800,
+        "p50": 3.4,
+        "p95": 7.8,
+        "max": 18.1
+      }
+    }
+  ],
+  "recovered": {
+    "intact": 10,
+    "runs": 10,
+    "milliseconds": {
+      "count": 10,
+      "p50": 624.2,
+      "p95": 667.6,
+      "max": 667.6
+    }
+  },
+  "runs": [
+    {
+      "language": "javascript",
+      "failures": 0,
+      "request": {
+        "count": 100,
+        "p50": 314,
+        "p95": 394.1,
+        "max": 485.3
+      },
+      "program": {
+        "count": 100,
+        "p50": 55,
+        "p95": 110,
+        "max": 119
+      }
+    },
+    {
+      "language": "python",
+      "failures": 0,
+      "request": {
+        "count": 100,
+        "p50": 263.4,
+        "p95": 283.4,
+        "max": 319.6
+      },
+      "program": {
+        "count": 100,
+        "p50": 40,
+        "p95": 48,
+        "max": 65
+      }
+    }
+  ],
+  "security": {
+    "passed": 10,
+    "total": 10
+  }
+}

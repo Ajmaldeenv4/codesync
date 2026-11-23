@@ -1,0 +1,25 @@
+{
+  "name": "@codesync/load",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "load": "tsx src/main.ts && pnpm -w exec prettier --write load/results.md",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codesync/db": "workspace:*",
+    "@codesync/shared": "workspace:*",
+    "tsx": "catalog:",
+    "ws": "8.23.0",
+    "y-websocket": "3.1.0",
+    "yjs": "13.6.33"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "8.18.2",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

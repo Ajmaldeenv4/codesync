@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "e2e": "playwright test",
+    "demo": "playwright test --config playwright.demo.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
     "@types/node": "catalog:",
+    "@types/pngjs": "6.0.5",
     "eslint": "catalog:",
+    "gifenc": "1.0.3",
+    "pngjs": "7.0.0",
     "typescript": "catalog:"
   }
 }

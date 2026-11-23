@@ -3,5 +3,5 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM"]
   },
-  "include": ["tests", "playwright.config.ts"]
+  "include": ["tests", "demo", "playwright.config.ts", "playwright.demo.config.ts"]
 }

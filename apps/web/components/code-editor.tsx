@@ -42,6 +42,8 @@ export default function CodeEditor({ language, text, awareness }: CodeEditorProp
         automaticLayout: true,
         fontSize: 14,
         minimap: { enabled: false },
+        // Room for a remote cursor's name label above line 1.
+        padding: { top: 18 },
         readOnly: !text,
         scrollBeyondLastLine: false,
         tabSize: language === "python" ? 4 : 2,

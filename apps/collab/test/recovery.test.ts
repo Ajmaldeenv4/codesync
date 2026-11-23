@@ -6,7 +6,7 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { createRoomFixture, hasDatabase } from "./db-fixtures";
-import { connectClient, SECRET, type TestClient } from "./helpers";
+import { connectClient, SECRET, waitFor, type TestClient } from "./helpers";
 
 const COLLAB_DIR = fileURLToPath(new URL("..", import.meta.url));
 const children = new Set<ChildProcess>();
@@ -98,6 +98,31 @@ describe.skipIf(!hasDatabase)("crash recovery (real server process + Postgres)",
     expect(reader.text.toString()).toBe(code);
     console.log(`recovery: restart to first synced doc in ${recoveryMs} ms`);
   }, 30_000);
+
+  test("SIGKILL before an edit is written: a client that stays open sends it again", async () => {
+    const port = await freePort();
+    const wsUrl = `ws://127.0.0.1:${port}`;
+    const server = await startCollab(port);
+    const writer = await connectClient(wsUrl, fixture.roomId, fixture.userId, "Writer");
+    clients.push(writer);
+    const rows = () => getPrisma().docUpdate.count({ where: { roomId: fixture.roomId } });
+    const rowsBefore = await rows();
+
+    writer.text.insert(0, "# not saved yet\n");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    server.kill("SIGKILL");
+    await exited(server);
+    expect(await rows()).toBe(rowsBefore);
+
+    await startCollab(port);
+    const reader = await connectClient(wsUrl, fixture.roomId, fixture.userId, "Reader");
+    clients.push(reader);
+    await waitFor(
+      () => reader.text.toString().startsWith("# not saved yet\n"),
+      "the open client to reconnect and resend",
+      15_000,
+    );
+  }, 40_000);
 
   // Windows has no catchable SIGTERM (child.kill terminates immediately), so this runs on
   // Linux/macOS, including CI.
