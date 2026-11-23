@@ -20,10 +20,17 @@ kill_timeout = 30
 [http_service]
   internal_port = 1234
   force_https = true
-  # Exactly one machine, always on. Deploy with --ha=false.
-  auto_stop_machines = "off"
+  # Exactly one machine (deploy with --ha=false). It sleeps when nobody is connected: stopping
+  # sends SIGTERM, which saves every room, and the next visitor wakes it.
+  auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
+
+  # Count open WebSockets, not requests, so an idle but open room keeps the machine awake.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 200
+    hard_limit = 250
 
   [[http_service.checks]]
     grace_period = "15s"
@@ -34,4 +41,4 @@ kill_timeout = 30
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "256mb"

@@ -3,8 +3,10 @@
 Three pieces plus a database: the web app on Vercel, the collab server and the runner on Fly.io,
 and Postgres on Neon. Run every command from the repo root.
 
-You need accounts on GitHub, Vercel, Fly.io (with a payment method) and Neon. Fly charges for the
-always-on collab machine and the runner's volume; the runner machine stops itself when idle.
+You need accounts on GitHub, Vercel, Fly.io (with a payment method) and Neon. Vercel and Neon have
+free plans. On Fly, both machines sleep when idle, so a demo should use well under the $5 a month
+its Free plan includes with a card on file. That is an allowance, not a cap: if a month goes over
+$5, Fly bills the whole month from the first cent.
 
 App names on Fly are global. If `codesync-collab` or `codesync-runner` is taken, change `app` in
 `apps/collab/fly.toml` / `apps/runner/fly.toml` and use your names below.
@@ -44,7 +46,7 @@ Migrations run before each release.
 
 ```bash
 flyctl apps create codesync-runner
-flyctl volumes create runner_docker --app codesync-runner --region iad --size 5
+flyctl volumes create runner_docker --app codesync-runner --region iad --size 1
 flyctl secrets set --app codesync-runner RUNNER_HMAC_KEY="..."
 flyctl deploy . --config apps/runner/fly.toml --dockerfile apps/runner/Dockerfile.fly --ha=false
 curl https://codesync-runner.fly.dev/health
