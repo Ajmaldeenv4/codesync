@@ -6,9 +6,12 @@ or Python code in a locked-down sandbox.
 
 ![Two people editing the same Python file, running it and chatting](docs/demo.gif)
 
-> **Status:** everything below works and is tested locally and in CI. It is not deployed yet: the
-> deploy configuration is written and tested in containers, and [docs/DEPLOY.md](docs/DEPLOY.md)
-> has the steps that need your accounts.
+**Live demo:** <https://codesync-weld.vercel.app>
+
+The web app runs on Vercel, the collaboration server on Render and Postgres on Neon, all on free
+plans ([how it is deployed](docs/DEPLOY.md)). The server sleeps when idle, so the first connection
+can take about a minute. **Run is off in the demo** because these free plans cannot run Docker; it works
+locally and is tested in CI.
 
 ## Features
 
@@ -147,6 +150,6 @@ CI runs the checks, the E2E tests, the security suite, and tests of the images t
 - **No free host for the runner.** It needs Docker, so Run is off on the free deployment. The Fly.io
   setup is written but unproven: its nested Docker works in a privileged container, and Fly does
   not document it. A small VPS works too.
-- **GitHub sign-in** is configured but has not been exercised end to end; tests use test users.
+- **GitHub sign-in** was checked by hand on the live site; automated tests use test users.
 - Auth.js v5 is still a beta release.
 - The chat panel and member list are hidden on narrow screens.

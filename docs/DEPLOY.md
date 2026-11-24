@@ -88,7 +88,7 @@ root on that machine. Then update the README and resume to say where the runner 
 ## 5. GitHub OAuth app
 
 Create a **production** OAuth app at <https://github.com/settings/developers> (separate from the
-local one). Callback URL: `https://<your-app>.vercel.app/api/auth/callback/github`.
+local one). Redirect URI: `https://<your-app>.vercel.app/api/auth/callback/github`.
 
 ## 6. Web app (Vercel)
 
@@ -109,6 +109,12 @@ Import the GitHub repository in Vercel and set:
 | `RUNNER_URL`                           | the runner, or leave empty         |
 | `RUNNER_HMAC_KEY`                      | from step 2                        |
 | `ENABLE_EXPERIMENTAL_COREPACK`         | `1` (uses the pinned pnpm version) |
+
+With the values in `.env.deploy.vercel` (git-ignored; not the local `.env`),
+`node scripts/push-vercel-secrets.mjs` uploads the secrets (set the project and team at the top of
+the script). Add the other three as type Config.
+
+Render adds a suffix to the service name if it is taken. Use the address shown in its dashboard.
 
 Do not set `AUTH_TEST_MODE`. Vercel is trusted by Auth.js automatically, so `AUTH_TRUST_HOST` is
 only needed if you host the web app elsewhere.
