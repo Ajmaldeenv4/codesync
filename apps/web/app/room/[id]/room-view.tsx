@@ -172,6 +172,7 @@ const STATUS_STYLES: Record<ConnectionStatus, { label: string; dot: string }> = 
   connecting: { label: "Connecting…", dot: "bg-amber-500 animate-pulse" },
   reconnecting: { label: "Reconnecting…", dot: "bg-amber-500 animate-pulse" },
   offline: { label: "Offline: edits will sync later", dot: "bg-red-500" },
+  too_large: { label: "Not saving: the file is too large. Copy your work.", dot: "bg-red-500" },
 };
 
 function StatusPill({ status }: { status: ConnectionStatus }) {

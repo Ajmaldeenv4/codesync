@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from "@codesync/db";
 import {
   mergeStates,
+  versionsToDrop,
+  type ChatAuthor,
   type ChatRecord,
   type DocStore,
   type LoadedDoc,
@@ -35,6 +37,13 @@ export class PrismaStore implements DocStore {
       const merged = mergeStates(snapshot, updates, state);
       await tx.snapshot.create({ data: { roomId, version, state: toBytes(merged) } });
       await tx.docUpdate.deleteMany({ where: { roomId } });
+      const versions = await tx.$queryRaw<{ version: number; createdAt: Date; bytes: number }[]>`
+        SELECT version, created_at AS "createdAt", octet_length(state) AS bytes
+        FROM snapshots WHERE room_id = ${roomId} ORDER BY version`;
+      const drop = versionsToDrop(versions);
+      if (drop.length > 0) {
+        await tx.snapshot.deleteMany({ where: { roomId, version: { in: drop } } });
+      }
       return version;
     });
   }
@@ -69,6 +78,14 @@ export class PrismaStore implements DocStore {
   async saveChat(messages: ChatRecord[]): Promise<void> {
     if (messages.length === 0) return;
     await this.db.chatMessage.createMany({ data: messages, skipDuplicates: true });
+  }
+
+  async findChat(roomId: string, ids: string[]): Promise<ChatAuthor[]> {
+    const rows = await this.db.chatMessage.findMany({
+      where: { roomId, id: { in: ids } },
+      select: { id: true, userId: true, text: true, user: { select: { name: true } } },
+    });
+    return rows.map(({ user, ...row }) => ({ ...row, name: user.name ?? "Anonymous" }));
   }
 }
 

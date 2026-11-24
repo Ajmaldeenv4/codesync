@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as Y from "yjs";
 import { RoomPersistence } from "../src/persistence";
-import { MemoryStore } from "../src/store";
+import { MemoryStore, versionsToDrop } from "../src/store";
 
 const ROOM = "room000001";
 
@@ -24,6 +24,40 @@ async function reload(store: MemoryStore) {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("history limits", () => {
+  const at = (version: number, minutes: number, bytes = 10) => ({
+    version,
+    createdAt: new Date(minutes * 60_000),
+    bytes,
+  });
+
+  test("nothing is dropped within the limits", () => {
+    expect(versionsToDrop([at(1, 0), at(2, 1), at(3, 2)], 3, 30)).toEqual([]);
+  });
+
+  test("a burst of versions does not push out older history", () => {
+    const older = [at(1, 0), at(2, 600), at(3, 1200)];
+    const burst = Array.from({ length: 20 }, (_, i) => at(4 + i, 5000 + i));
+    const dropped = versionsToDrop([...older, ...burst], 10, 1_000_000);
+    expect(dropped).toHaveLength(13);
+    for (const kept of [1, 2, 3, 23]) expect(dropped).not.toContain(kept);
+  });
+
+  test("large versions are limited by total size, and the newest always stays", () => {
+    const versions = [at(1, 0, 60), at(2, 10, 60), at(3, 20, 60)];
+    expect(versionsToDrop(versions, 50, 130)).toEqual([2]);
+    expect(versionsToDrop(versions, 50, 1)).toEqual([2, 1]);
+  });
+
+  test("a lot of written bytes are folded into a snapshot early", async () => {
+    const { store, text, persistence } = await setup(undefined, { compactBytes: 5_000 });
+    text.insert(0, "x".repeat(6_000));
+    await persistence.flush();
+    expect(store.snapshots.get(ROOM)).toHaveLength(1);
+    expect(store.updates.get(ROOM)).toEqual([]);
+  });
 });
 
 describe("batching", () => {

@@ -101,8 +101,14 @@ from inside a probe container and refuses to run code if any is missing. The
 **Between services.** The collab server rejects a WebSocket without a valid room token (a JWT that
 lasts 5 minutes and is bound to one room) and, in production, from any other site. The runner and
 the collab server's internal API accept only HMAC-signed requests less than 60 seconds old. Runs
-are rate limited per user. Chat saved to the database is attributed to the verified token, not to
-what the browser claims.
+are rate limited per user. GitHub tokens are discarded after sign-in.
+
+**Signed-in attackers.** Anyone with a GitHub account can connect, so nothing they control may grow
+without bound. The server limits [connections, data, document size and
+presence](apps/collab/src/limits.ts) per user and room, drops clients that stop reading, and keeps
+at most 50 versions (4 MB) of history per room. A user can own 50 rooms. Chat messages are corrected
+to the sender's verified identity before anyone sees them. The
+[abuse tests](apps/collab/test/abuse.test.ts) attack a real server.
 
 Containers share the host's kernel, so a kernel exploit could escape one. The runner should have a
 machine to itself.
@@ -115,14 +121,14 @@ included**.
 
 | Metric                                                 | Result       |
 | ------------------------------------------------------ | ------------ |
-| Edit in A to visible in B, p50 / p95                   | 0.6 / 1.0 ms |
+| Edit in A to visible in B, p50 / p95                   | 0.9 / 1.3 ms |
 | 200 clients in one room, lost edits                    | 0 of 39,800  |
 | 200 clients in one room, dropped connections           | 0            |
-| 200 clients, edit to visible everywhere, p50 / p95     | 3.6 / 8.3 ms |
-| `kill -9`, restart to first synced document, p50 / p95 | 607 / 664 ms |
+| 200 clients, edit to visible everywhere, p50 / p95     | 3.5 / 8.7 ms |
+| `kill -9`, restart to first synced document, p50 / p95 | 700 / 724 ms |
 | Documents intact after `kill -9`                       | 10 of 10     |
-| JavaScript run, request to result, p50 / p95           | 288 / 346 ms |
-| Python run, request to result, p50 / p95               | 274 / 315 ms |
+| JavaScript run, request to result, p50 / p95           | 341 / 403 ms |
+| Python run, request to result, p50 / p95               | 368 / 549 ms |
 | Sandbox security tests passed                          | 10 of 10     |
 
 ## Tests
@@ -147,6 +153,9 @@ CI runs the checks, the E2E tests, the security suite, and tests of the images t
 - **Up to 500 ms of edits can be lost on the server** if it is killed without warning. Connected
   browsers still hold them and send them again when they reconnect.
 - **Presence names are self-reported.** A modified client could show a false name on its cursor.
+- **Anyone in a room can delete anything in it,** including other people's chat messages. The owner
+  can restore code from history, but cannot remove a member.
+- **Documents are limited to 1 MB.**
 - **No free host for the runner.** It needs Docker, so Run is off on the free deployment. The Fly.io
   setup is written but unproven: its nested Docker works in a privileged container, and Fly does
   not document it. A small VPS works too.

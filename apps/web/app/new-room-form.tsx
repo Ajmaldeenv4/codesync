@@ -6,8 +6,14 @@ import { useState, type FormEvent } from "react";
 
 const LANGUAGE_LABELS: Record<Language, string> = { javascript: "JavaScript", python: "Python" };
 
+const LIMIT_MESSAGES: Record<string, string> = {
+  too_many_rooms_recently: "You've created a lot of rooms. Wait an hour and try again.",
+  room_limit: "You've reached the most rooms one person can own. Reuse one of yours.",
+};
+
 interface CreateRoomResponse {
   room?: { id: string };
+  error?: string;
   issues?: { name?: string[] };
 }
 
@@ -29,7 +35,11 @@ export function NewRoomForm() {
       });
       const data = (await res.json()) as CreateRoomResponse;
       if (!res.ok || !data.room) {
-        setError(data.issues?.name?.[0] ?? "Couldn't create the room. Try again.");
+        setError(
+          data.issues?.name?.[0] ??
+            LIMIT_MESSAGES[data.error ?? ""] ??
+            "Couldn't create the room. Try again.",
+        );
         setPending(false);
         return;
       }

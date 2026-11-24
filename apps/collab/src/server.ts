@@ -1,7 +1,7 @@
 import { roomIdSchema } from "@codesync/shared";
 import { textFromState } from "@codesync/shared/doc";
 import { SIGNATURE_HEADER, verifyRequest } from "@codesync/shared/hmac";
-import { verifyRoomToken } from "@codesync/shared/token";
+import { verifyRoomToken, type RoomTokenClaims } from "@codesync/shared/token";
 import {
   createServer,
   STATUS_CODES,
@@ -12,9 +12,10 @@ import {
 import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
+import { DEFAULT_LIMITS, LimitError, UserLimits, type CollabLimits } from "./limits";
 import { RateCounter, type CollabMetrics } from "./metrics";
 import type { PersistenceOptions } from "./persistence";
-import { RoomManager } from "./room";
+import { RoomManager, type Room } from "./room";
 import { MemoryStore, type DocStore } from "./store";
 
 export interface CollabServerOptions {
@@ -32,8 +33,8 @@ export interface CollabServerOptions {
   persistence?: PersistenceOptions;
   /** How often to ping clients; a client that misses one pong is dropped. */
   pingIntervalMs?: number;
-  /** Largest accepted WebSocket message, in bytes. */
-  maxPayloadBytes?: number;
+  /** Overrides for what users, rooms and connections may use. */
+  limits?: Partial<CollabLimits>;
 }
 
 export interface CollabServer {
@@ -54,8 +55,9 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     allowedOrigins,
     store = new MemoryStore(),
     pingIntervalMs = 30_000,
-    maxPayloadBytes = 5 * 1024 * 1024,
   } = options;
+  const limits = { ...DEFAULT_LIMITS, ...options.limits };
+  const users = new UserLimits(limits);
   const startedAt = Date.now();
   const updateRate = new RateCounter();
   const rooms = new RoomManager(
@@ -65,10 +67,32 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       onChat: (messages) => {
         store.saveChat(messages).catch((err: unknown) => console.error("chat mirror failed", err));
       },
+      findChat: (roomId, ids) => store.findChat(roomId, ids),
     },
     options.persistence,
+    limits,
+    users,
   );
-  const wss = new WebSocketServer({ noServer: true, maxPayload: maxPayloadBytes });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: limits.messageBytes });
+  /** Connections per user, including ones still being set up. */
+  const held = new Map<string, number>();
+  let heldTotal = 0;
+
+  /** Counts a connection against its user until the returned function is called. */
+  function holdConnection(user: string): () => void {
+    held.set(user, (held.get(user) ?? 0) + 1);
+    heldTotal += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      heldTotal -= 1;
+      const left = (held.get(user) ?? 1) - 1;
+      if (left > 0) held.set(user, left);
+      else held.delete(user);
+    };
+  }
+
   const alive = new WeakMap<WebSocket, boolean>();
 
   const metrics = (): CollabMetrics => ({
@@ -139,6 +163,9 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   }
 
   server.on("upgrade", (req, socket, head) => {
+    // Node stops handling this socket's errors once it is handed over. Without a listener, a
+    // connection reset before the WebSocket is set up would take the whole process down.
+    socket.on("error", () => socket.destroy());
     handleUpgrade(req, socket, head).catch((err: unknown) => {
       console.error("upgrade failed", err);
       reject(socket, 500);
@@ -160,39 +187,65 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     const verified = await verifyRoomToken(token, tokenSecret, roomId);
     if (!verified.ok) return reject(socket, verified.reason === "wrong_room" ? 403 : 401);
 
-    // Reserve the room (loading it from the store if needed) until the socket is attached.
-    let room;
-    try {
-      room = await rooms.acquire(roomId);
-    } catch (err) {
-      rooms.release(roomId);
-      throw err;
-    }
-    if (socket.destroyed) {
-      rooms.release(roomId);
-      return;
+    const user = verified.claims.sub;
+    if (
+      heldTotal >= limits.connections ||
+      (held.get(user) ?? 0) >= limits.connectionsPerUser ||
+      !users.connects.take(user)
+    ) {
+      return reject(socket, 429);
     }
 
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      alive.set(ws, true);
-      ws.on("pong", () => alive.set(ws, true));
-      ws.on("message", (data, isBinary) => {
-        if (!isBinary) return ws.close(1003, "binary messages only");
-        try {
-          room.handleMessage(ws, toUint8Array(data));
-        } catch (err) {
-          console.warn(`room ${roomId}: dropping client after bad message`, err);
+    // Reserve the room (loading it from the store if needed) until the socket is attached.
+    const releaseConnection = holdConnection(user);
+    let attached = false;
+    try {
+      const room = await rooms.acquire(roomId);
+      if (socket.destroyed) return;
+      if (room.connectionCount >= limits.connectionsPerRoom) return reject(socket, 429);
+      // Calls back synchronously, or not at all if the handshake is invalid.
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        attached = true;
+        attach(ws, room, verified.claims, releaseConnection);
+      });
+    } finally {
+      rooms.release(roomId);
+      if (!attached) releaseConnection();
+    }
+  }
+
+  function attach(
+    ws: WebSocket,
+    room: Room,
+    claims: RoomTokenClaims,
+    releaseConnection: () => void,
+  ) {
+    alive.set(ws, true);
+    ws.on("pong", () => alive.set(ws, true));
+    ws.on("message", (data, isBinary) => {
+      if (!isBinary) return ws.close(1003, "binary messages only");
+      try {
+        room.handleMessage(ws, toUint8Array(data));
+      } catch (err) {
+        // Ignore anything else it sends while closing.
+        room.removeConnection(ws);
+        if (err instanceof LimitError) {
+          console.warn(`room ${room.id}: dropping client: ${err.message}`);
+          ws.close(err.closeCode, err.message);
+        } else {
+          console.warn(`room ${room.id}: dropping client after bad message`, err);
           ws.close(1007, "bad message");
         }
-      });
-      ws.on("close", () => {
-        room.removeConnection(ws);
-        rooms.evictIfIdle(roomId);
-      });
-      ws.on("error", () => ws.terminate());
-      room.addConnection(ws, verified.claims);
-      rooms.release(roomId);
+        setTimeout(() => ws.terminate(), 2000).unref();
+      }
     });
+    ws.on("close", () => {
+      releaseConnection();
+      room.removeConnection(ws);
+      rooms.evictIfIdle(room.id);
+    });
+    ws.on("error", () => ws.terminate());
+    room.addConnection(ws, claims);
   }
 
   // Heartbeat: drop connections that stop answering pings (dead networks, sleeping laptops).

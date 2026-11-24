@@ -42,7 +42,8 @@ function lazyPrisma(): Parameters<typeof PrismaAdapter>[0] {
   return deferred as unknown as Parameters<typeof PrismaAdapter>[0];
 }
 
-const providers: NextAuthConfig["providers"] = [GitHub];
+// GitHub is only used to sign in, so its tokens are dropped instead of stored with the account.
+const providers: NextAuthConfig["providers"] = [GitHub({ account: () => ({}) })];
 if (isTestAuthEnabled(process.env)) providers.push(testProvider());
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

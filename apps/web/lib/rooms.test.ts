@@ -38,6 +38,28 @@ describe.skipIf(!process.env.DATABASE_URL)("rooms data layer", () => {
     expect(await getRoom(db, room.id)).toMatchObject({ id: room.id, name: "Pairing" });
   });
 
+  test("a user can only create so many rooms an hour and in total", async () => {
+    const user = await db.user.create({
+      data: { name: "Busy", email: `busy-${run}@vitest.codesync.invalid` },
+    });
+    const make = () =>
+      createRoom(db, user.id, { name: "R", language: "python" }, { perHour: 3, total: 4 });
+    try {
+      // At the same time, so a check that isn't atomic would let more through.
+      const results = await Promise.allSettled([make(), make(), make(), make(), make()]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(3);
+      await expect(make()).rejects.toMatchObject({ code: "too_many_rooms_recently" });
+
+      const hourAgo = new Date(Date.now() - 61 * 60_000);
+      await db.room.updateMany({ where: { ownerId: user.id }, data: { createdAt: hourAgo } });
+      await make();
+      await expect(make()).rejects.toMatchObject({ code: "room_limit" });
+      expect(await db.room.count({ where: { ownerId: user.id } })).toBe(4);
+    } finally {
+      await db.user.delete({ where: { id: user.id } });
+    }
+  });
+
   test("getRoom returns null for an unknown id", async () => {
     expect(await getRoom(db, "nosuchroom")).toBeNull();
   });

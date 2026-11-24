@@ -9,12 +9,24 @@ export const DOC_CHAT_KEY = "chat";
 
 export const CHAT_MAX_LENGTH = 2000;
 
+/** Names are cut to this length in chat. */
+export const CHAT_NAME_LENGTH = 60;
+
+/** The latest time a JavaScript Date can hold; formatting a later one throws. */
+const MAX_TIMESTAMP = 8_640_000_000_000_000;
+
 export const chatMessageSchema = z.object({
-  id: z.string().min(8).max(64),
+  id: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
   userId: z.string().min(1).max(64),
-  name: z.string().max(60),
-  text: z.string().trim().min(1).max(CHAT_MAX_LENGTH),
-  ts: z.number().int().nonnegative(),
+  name: z.string().max(CHAT_NAME_LENGTH),
+  // Postgres text cannot hold NUL.
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(CHAT_MAX_LENGTH)
+    .refine((text) => !text.includes("\0")),
+  ts: z.number().int().nonnegative().max(MAX_TIMESTAMP),
 });
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;

@@ -103,10 +103,11 @@ export interface Client {
   disconnects: number;
 }
 
-export async function connect(port: number, roomId: string, userId: string): Promise<Client> {
+/** Every client is a different person, since the server limits connections per user. */
+export async function connect(port: number, roomId: string): Promise<Client> {
   const doc = new Y.Doc();
   const token = await signRoomToken(
-    { sub: userId, roomId, name: "Load", avatar: null },
+    { sub: randomUUID(), roomId, name: "Load", avatar: null },
     TOKEN_SECRET,
   );
   const provider = new WebsocketProvider(`ws://127.0.0.1:${port}`, roomId, doc, {

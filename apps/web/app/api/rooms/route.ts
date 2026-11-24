@@ -1,7 +1,7 @@
 import { getPrisma } from "@codesync/db";
 import { createRoomSchema } from "@codesync/shared";
 import { z } from "zod";
-import { createRoom, listRecentRooms } from "@/lib/rooms";
+import { createRoom, listRecentRooms, RoomLimitError } from "@/lib/rooms";
 import { getCurrentUser } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -23,8 +23,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const room = await createRoom(getPrisma(), user.id, parsed.data);
-  return Response.json({ room }, { status: 201 });
+  try {
+    const room = await createRoom(getPrisma(), user.id, parsed.data);
+    return Response.json({ room }, { status: 201 });
+  } catch (err) {
+    if (err instanceof RoomLimitError) return Response.json({ error: err.code }, { status: 429 });
+    throw err;
+  }
 }
 
 export async function GET() {

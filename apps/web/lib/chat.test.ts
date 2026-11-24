@@ -9,6 +9,16 @@ describe("parseChat", () => {
     expect(parseChat(items).map((m) => m.id)).toEqual(["message-1"]);
   });
 
+  test("drops dates that cannot be displayed", () => {
+    const items = [{ ...valid("message-1"), ts: Number.MAX_SAFE_INTEGER }, valid("message-2")];
+    expect(parseChat(items).map((m) => m.id)).toEqual(["message-2"]);
+  });
+
+  test("shows a repeated message once", () => {
+    const items = [valid("message-1", "first"), valid("message-1", "copy")];
+    expect(parseChat(items).map((m) => m.text)).toEqual(["first"]);
+  });
+
   test("keeps only the newest `limit` entries", () => {
     const items = Array.from({ length: 5 }, (_, i) => valid(`message-${i}`));
     expect(parseChat(items, 2).map((m) => m.id)).toEqual(["message-3", "message-4"]);

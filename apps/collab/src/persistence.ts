@@ -14,6 +14,8 @@ export interface PersistenceOptions {
   batchMs?: number;
   /** Compact into a snapshot once this many rows have been written since the last one. */
   compactEvery?: number;
+  /** Also compact once this many bytes have been written since the last one. */
+  compactBytes?: number;
   /** Delay before retrying a failed write. */
   retryMs?: number;
   onError?: (err: unknown, roomId: string) => void;
@@ -26,6 +28,7 @@ export class RoomPersistence {
   private closed = false;
   private readonly batchMs: number;
   private readonly compactEvery: number;
+  private readonly compactBytes: number;
   private readonly retryMs: number;
   private readonly onError: (err: unknown, roomId: string) => void;
 
@@ -34,10 +37,12 @@ export class RoomPersistence {
     private readonly store: DocStore,
     private readonly doc: Y.Doc,
     private rowsSinceSnapshot: number,
+    private bytesSinceSnapshot: number,
     options: PersistenceOptions,
   ) {
     this.batchMs = options.batchMs ?? 500;
     this.compactEvery = options.compactEvery ?? 200;
+    this.compactBytes = options.compactBytes ?? 2 * 1024 * 1024;
     this.retryMs = options.retryMs ?? 2000;
     this.onError =
       options.onError ?? ((err, id) => console.error(`persistence error in room ${id}`, err));
@@ -53,7 +58,8 @@ export class RoomPersistence {
     const { snapshot, updates } = await store.load(roomId);
     if (snapshot) Y.applyUpdate(doc, snapshot.state, LOAD_ORIGIN);
     for (const { update } of updates) Y.applyUpdate(doc, update, LOAD_ORIGIN);
-    return new RoomPersistence(roomId, store, doc, updates.length, options);
+    const bytes = updates.reduce((sum, { update }) => sum + update.byteLength, 0);
+    return new RoomPersistence(roomId, store, doc, updates.length, bytes, options);
   }
 
   /** Number of rows written since the last snapshot (for tests and metrics). */
@@ -108,7 +114,9 @@ export class RoomPersistence {
       return;
     }
     this.rowsSinceSnapshot += 1;
-    if (this.rowsSinceSnapshot >= this.compactEvery) await this.compactNow();
+    this.bytesSinceSnapshot += update.byteLength;
+    const { rowsSinceSnapshot: rows, bytesSinceSnapshot: bytes } = this;
+    if (rows >= this.compactEvery || bytes >= this.compactBytes) await this.compactNow();
   }
 
   private async compactNow(): Promise<void> {
@@ -117,6 +125,7 @@ export class RoomPersistence {
     try {
       await this.store.compact(this.roomId, Y.encodeStateAsUpdate(this.doc));
       this.rowsSinceSnapshot = 0;
+      this.bytesSinceSnapshot = 0;
     } catch (err) {
       // The rows are still there, so nothing is lost; the next compaction retries.
       this.onError(err, this.roomId);

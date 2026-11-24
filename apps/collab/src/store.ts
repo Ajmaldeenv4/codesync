@@ -28,6 +28,18 @@ export interface ChatRecord {
   createdAt: Date;
 }
 
+/** A saved chat message and who sent it. */
+export interface ChatAuthor {
+  id: string;
+  userId: string;
+  name: string;
+  text: string;
+}
+
+/** History kept per room; see versionsToDrop. */
+export const MAX_VERSIONS = 50;
+export const MAX_HISTORY_BYTES = 4 * 1024 * 1024;
+
 export interface DocStore {
   load(roomId: string): Promise<LoadedDoc>;
   /**
@@ -44,6 +56,40 @@ export interface DocStore {
   getSnapshot(roomId: string, version: number): Promise<StoredSnapshot | null>;
   /** Idempotent on message id. */
   saveChat(messages: ChatRecord[]): Promise<void>;
+  /** The saved messages with these ids in this room. */
+  findChat(roomId: string, ids: string[]): Promise<ChatAuthor[]>;
+}
+
+/**
+ * Which versions (oldest first) to delete so a room's history stays within its limits. The newest
+ * always stays. Versions saved in quick succession go first, so someone who makes many versions
+ * on purpose mostly pushes out their own instead of the room's older history.
+ */
+export function versionsToDrop(
+  versions: { version: number; createdAt: Date; bytes: number }[],
+  maxVersions = MAX_VERSIONS,
+  maxBytes = MAX_HISTORY_BYTES,
+): number[] {
+  const kept = [...versions];
+  const dropped: number[] = [];
+  let total = kept.reduce((sum, v) => sum + v.bytes, 0);
+  const timeOf = (i: number) => kept[i]?.createdAt.getTime() ?? 0;
+  while (kept.length > 1 && (kept.length > maxVersions || total > maxBytes)) {
+    let victim = 0;
+    let smallestGap = Infinity;
+    for (let i = 1; i < kept.length - 1; i++) {
+      const gap = timeOf(i + 1) - timeOf(i - 1);
+      if (gap < smallestGap) {
+        smallestGap = gap;
+        victim = i;
+      }
+    }
+    const [removed] = kept.splice(victim, 1);
+    if (!removed) break;
+    total -= removed.bytes;
+    dropped.push(removed.version);
+  }
+  return dropped;
 }
 
 /** One state containing everything in the snapshot, the updates and `state`. */
@@ -67,6 +113,7 @@ export class MemoryStore implements DocStore {
   readonly updates = new Map<string, StoredUpdate[]>();
   readonly snapshots = new Map<string, StoredSnapshot[]>();
   readonly chat = new Map<string, ChatRecord>();
+  readonly userNames = new Map<string, string>();
 
   async load(roomId: string): Promise<LoadedDoc> {
     const snapshots = this.snapshots.get(roomId) ?? [];
@@ -88,7 +135,11 @@ export class MemoryStore implements DocStore {
     const version = (latest?.version ?? 0) + 1;
     const merged = mergeStates(latest, this.updates.get(roomId) ?? [], state);
     snapshots.push({ version, state: merged, createdAt: new Date() });
-    this.snapshots.set(roomId, snapshots);
+    const drop = versionsToDrop(snapshots.map((s) => ({ ...s, bytes: s.state.byteLength })));
+    this.snapshots.set(
+      roomId,
+      snapshots.filter((s) => !drop.includes(s.version)),
+    );
     this.updates.set(roomId, []);
     return version;
   }
@@ -99,5 +150,14 @@ export class MemoryStore implements DocStore {
 
   async saveChat(messages: ChatRecord[]): Promise<void> {
     for (const m of messages) if (!this.chat.has(m.id)) this.chat.set(m.id, m);
+  }
+
+  async findChat(roomId: string, ids: string[]): Promise<ChatAuthor[]> {
+    return ids.flatMap((id) => {
+      const saved = this.chat.get(id);
+      if (saved?.roomId !== roomId) return [];
+      const { userId, text } = saved;
+      return [{ id, userId, text, name: this.userNames.get(userId) ?? "Anonymous" }];
+    });
   }
 }

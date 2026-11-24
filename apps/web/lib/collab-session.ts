@@ -3,6 +3,7 @@
 // Strict Mode double-mount is safe (start/stop do the work).
 import {
   CHAT_MAX_LENGTH,
+  CHAT_NAME_LENGTH,
   DOC_CHAT_KEY,
   DOC_TEXT_KEY,
   type ChatMessage,
@@ -14,7 +15,13 @@ import * as Y from "yjs";
 import { parseChat } from "./chat";
 import { colorForUser, readPresence, type PresenceUser, type RemotePresence } from "./presence";
 
-export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "offline";
+export type ConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "offline"
+  /** The server refused an edit because the document is too large, and stopped syncing. */
+  | "too_large";
 
 export interface CollabSnapshot {
   status: ConnectionStatus;
@@ -72,7 +79,7 @@ export class CollabSession {
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       userId: user.id,
-      name: user.name,
+      name: user.name.slice(0, CHAT_NAME_LENGTH),
       text,
       ts: Date.now(),
     };
@@ -111,6 +118,7 @@ export class CollabSession {
 
     let disposed = false;
     let everConnected = false;
+    let refused = false;
 
     const refreshToken = async () => {
       const res = await fetch(`/api/rooms/${roomId}/token`, { cache: "no-store" });
@@ -122,17 +130,20 @@ export class CollabSession {
 
     const onStatus = ({ status }: { status: "connected" | "disconnected" | "connecting" }) => {
       if (status === "connected") everConnected = true;
-      this.update({ status: this.describe(status, everConnected) });
+      if (!refused) this.update({ status: this.describe(status, everConnected) });
+    };
+    // The server closed the connection for good (see CLOSE_ROOM_FULL in the collab server).
+    const onRefused = () => {
+      refused = true;
+      this.update({ status: "too_large" });
     };
     // A dropped connection may be an expired token; fetch a fresh one before the retry.
     const onClose = () => void refreshToken().catch(() => undefined);
     const onAwareness = () => this.update(this.presenceState(readPresence(awareness.getStates())));
-    const onNetwork = () =>
-      this.update({
-        status: this.describe(provider.wsconnected ? "connected" : "connecting", everConnected),
-      });
+    const onNetwork = () => onStatus({ status: provider.wsconnected ? "connected" : "connecting" });
 
     provider.on("status", onStatus);
+    provider.on("closed", onRefused);
     provider.on("connection-close", onClose);
     awareness.on("change", onAwareness);
     window.addEventListener("online", onNetwork);
@@ -169,6 +180,7 @@ export class CollabSession {
       window.removeEventListener("offline", onNetwork);
       awareness.off("change", onAwareness);
       provider.off("status", onStatus);
+      provider.off("closed", onRefused);
       provider.off("connection-close", onClose);
       provider.destroy();
       doc.destroy();

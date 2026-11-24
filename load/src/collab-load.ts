@@ -21,8 +21,8 @@ export async function syncLatency(edits = 500): Promise<Summary> {
   const server = await startCollab(port);
   const room = await createRoom();
   try {
-    const writer = await connect(port, room.roomId, room.userId);
-    const reader = await connect(port, room.roomId, room.userId);
+    const writer = await connect(port, room.roomId);
+    const reader = await connect(port, room.roomId);
     const sentAt: number[] = [];
     const samples: number[] = [];
     trackEdits([reader], (id) => samples.push(performance.now() - (sentAt[id] ?? NaN)));
@@ -62,7 +62,7 @@ export async function roomLoad(clientCount: number, seconds = 10): Promise<RoomL
   try {
     for (let i = 0; i < clientCount; i += 10) {
       const batch = Array.from({ length: Math.min(10, clientCount - i) }, () =>
-        connect(port, room.roomId, room.userId),
+        connect(port, room.roomId),
       );
       clients.push(...(await Promise.all(batch)));
     }
@@ -117,7 +117,7 @@ export async function recovery(runs = 10): Promise<Recovery> {
   const room = await createRoom();
   let server = await startCollab(port);
   try {
-    const writer = await connect(port, room.roomId, room.userId);
+    const writer = await connect(port, room.roomId);
     const code = "print('a line of code that must survive a crash')\n".repeat(400);
     writer.text.insert(0, code);
     await sleep(1500);
@@ -129,7 +129,7 @@ export async function recovery(runs = 10): Promise<Recovery> {
       await server.kill();
       const startedAt = performance.now();
       server = await startCollab(port);
-      const reader = await connect(port, room.roomId, room.userId);
+      const reader = await connect(port, room.roomId);
       samples.push(performance.now() - startedAt);
       if (reader.text.toString() === code) intact += 1;
       disconnect(reader);
