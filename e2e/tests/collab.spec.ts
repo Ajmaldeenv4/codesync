@@ -37,6 +37,20 @@ async function focusEditor(page: Page) {
   await page.locator(".monaco-editor .view-lines").click();
 }
 
+test("a file over the size limit says it is not being saved", async ({ browser }) => {
+  const page = await newUserPage(browser, `Big ${Date.now().toString(36)}`);
+  await page.getByPlaceholder("Interview prep").fill("Too big");
+  await page.getByRole("button", { name: "Create room" }).click();
+  await page.waitForURL(/\/room\/[A-Za-z0-9_-]{10}$/);
+  await waitUntilConnected(page);
+  await focusEditor(page);
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText(`# ${"x".repeat(97)}\n`.repeat(11_000)));
+  await page.keyboard.press("ControlOrMeta+V");
+  await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "too_large");
+  await expect(page.getByText("Not saving")).toBeVisible();
+});
+
 test("two users edit one room concurrently, converge, and see each other's cursors", async ({
   browser,
 }) => {

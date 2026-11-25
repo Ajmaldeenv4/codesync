@@ -17,6 +17,7 @@
     "@codesync/shared": "workspace:*",
     "@monaco-editor/react": "4.7.0",
     "@next/env": "16.4.6",
+    "lib0": "0.2.120",
     "monaco-editor": "0.57.0",
     "nanoid": "6.0.2",
     "next": "16.4.6",

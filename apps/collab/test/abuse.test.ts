@@ -3,6 +3,8 @@
 import { fork, type ChildProcess } from "node:child_process";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
+import { CLOSE_ROOM_FULL, MESSAGE_NOTICE } from "@codesync/shared/doc";
+import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import * as syncProtocol from "y-protocols/sync";
 import { afterEach, describe, expect, test } from "vitest";
@@ -182,6 +184,23 @@ describe("limits", () => {
     doc.getText("monaco").insert(0, "y".repeat(5_000));
     await waitFor(() => closeCode() !== undefined, "the connection to be closed");
     expect(closeCode()).toBe(4413);
+  });
+
+  test("the reason is sent as a message, since some proxies swallow close codes", async () => {
+    const server = await start({ limits: { docBytes: 1_000, docBytesHard: 2_000 } });
+    const { ws, closeCode } = await rawSocket(server, "notice0001");
+    const notices: number[] = [];
+    ws.on("message", (data: Buffer) => {
+      const decoder = decoding.createDecoder(new Uint8Array(data));
+      if (decoding.readVarUint(decoder) === MESSAGE_NOTICE) {
+        notices.push(decoding.readVarUint(decoder));
+      }
+    });
+    const doc = new Y.Doc();
+    doc.getText("monaco").insert(0, "x".repeat(5_000));
+    ws.send(syncUpdate(Y.encodeStateAsUpdate(doc)));
+    await waitFor(() => closeCode() !== undefined, "the connection to be closed");
+    expect(notices).toEqual([CLOSE_ROOM_FULL]);
   });
 
   test("a flood of edits is cut off even when the document stays small", async () => {

@@ -3,6 +3,8 @@
 import {
   CHAT_NAME_LENGTH,
   chatMessageSchema,
+  CLOSE_POLICY,
+  CLOSE_ROOM_FULL,
   DOC_CHAT_KEY,
   DOC_TEXT_KEY,
   type ChatMessage,
@@ -15,8 +17,6 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import {
-  CLOSE_POLICY,
-  CLOSE_ROOM_FULL,
   DEFAULT_LIMITS,
   LimitError,
   SMALL_EDIT_BYTES,

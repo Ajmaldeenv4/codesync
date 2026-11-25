@@ -7,6 +7,16 @@ export const DOC_TEXT_KEY = "monaco";
 /** Y.Array of chat messages, synced and persisted with the code. */
 export const DOC_CHAT_KEY = "chat";
 
+/**
+ * WebSocket message (beside y-websocket's 0-3) carrying the code the server is about to close the
+ * connection with. Render's proxy does not pass close codes on to the browser.
+ */
+export const MESSAGE_NOTICE = 4;
+/** Too much data: reconnect. */
+export const CLOSE_POLICY = 1008;
+/** The document is too large: don't reconnect. (y-websocket treats 44xx codes as permanent.) */
+export const CLOSE_ROOM_FULL = 4413;
+
 export const CHAT_MAX_LENGTH = 2000;
 
 /** Names are cut to this length in chat. */

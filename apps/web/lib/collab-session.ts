@@ -4,11 +4,14 @@
 import {
   CHAT_MAX_LENGTH,
   CHAT_NAME_LENGTH,
+  CLOSE_ROOM_FULL,
   DOC_CHAT_KEY,
   DOC_TEXT_KEY,
+  MESSAGE_NOTICE,
   type ChatMessage,
 } from "@codesync/shared/doc";
 import { ROOM_TOKEN_TTL_SECONDS } from "@codesync/shared/token";
+import * as decoding from "lib0/decoding";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
@@ -44,6 +47,9 @@ export interface CollabSessionOptions {
 
 /** Refresh well before the room token expires so reconnects always carry a valid one. */
 const TOKEN_REFRESH_MS = Math.max(30, ROOM_TOKEN_TTL_SECONDS - 60) * 1000;
+
+/** Wait before reconnecting after the server said we sent too much. */
+const RETRY_MS = 2000;
 
 const INITIAL: CollabSnapshot = {
   status: "connecting",
@@ -132,10 +138,19 @@ export class CollabSession {
       if (status === "connected") everConnected = true;
       if (!refused) this.update({ status: this.describe(status, everConnected) });
     };
-    // The server closed the connection for good (see CLOSE_ROOM_FULL in the collab server).
+    // The server closed the connection for good (CLOSE_ROOM_FULL).
     const onRefused = () => {
       refused = true;
       this.update({ status: "too_large" });
+    };
+    // Why the server is about to close the connection. It may be a while before the browser sees
+    // the close itself, so act on this at once.
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    provider.messageHandlers[MESSAGE_NOTICE] = (_encoder, decoder) => {
+      const code = decoding.readVarUint(decoder);
+      provider.disconnect();
+      if (code === CLOSE_ROOM_FULL) onRefused();
+      else retryTimer = setTimeout(() => provider.connect(), RETRY_MS);
     };
     // A dropped connection may be an expired token; fetch a fresh one before the retry.
     const onClose = () => void refreshToken().catch(() => undefined);
@@ -176,6 +191,7 @@ export class CollabSession {
       this.chatArray = null;
       chatArray.unobserve(onChat);
       clearInterval(refreshTimer);
+      clearTimeout(retryTimer);
       window.removeEventListener("online", onNetwork);
       window.removeEventListener("offline", onNetwork);
       awareness.off("change", onAwareness);

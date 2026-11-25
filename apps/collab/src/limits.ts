@@ -56,11 +56,7 @@ export const DEFAULT_LIMITS: CollabLimits = {
 /** Edits up to this size are still accepted between docBytes and docBytesHard. */
 export const SMALL_EDIT_BYTES = 1 * KB;
 
-/** Close codes: y-websocket reconnects after POLICY, and gives up after ROOM_FULL (44xx). */
-export const CLOSE_POLICY = 1008;
-export const CLOSE_ROOM_FULL = 4413;
-
-/** Thrown while handling a message to close that connection with a specific code. */
+/** Thrown while handling a message to close that connection with a code (CLOSE_* in @codesync/shared/doc). */
 export class LimitError extends Error {
   constructor(
     readonly closeCode: number,

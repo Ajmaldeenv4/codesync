@@ -303,6 +303,9 @@ importers:
       '@next/env':
         specifier: 16.4.6
         version: 16.4.6
+      lib0:
+        specifier: 0.2.120
+        version: 0.2.120
       monaco-editor:
         specifier: 0.57.0
         version: 0.57.0

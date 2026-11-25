@@ -1,7 +1,8 @@
 import { roomIdSchema } from "@codesync/shared";
-import { textFromState } from "@codesync/shared/doc";
+import { MESSAGE_NOTICE, textFromState } from "@codesync/shared/doc";
 import { SIGNATURE_HEADER, verifyRequest } from "@codesync/shared/hmac";
 import { verifyRoomToken, type RoomTokenClaims } from "@codesync/shared/token";
+import * as encoding from "lib0/encoding";
 import {
   createServer,
   STATUS_CODES,
@@ -231,6 +232,10 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
         room.removeConnection(ws);
         if (err instanceof LimitError) {
           console.warn(`room ${room.id}: dropping client: ${err.message}`);
+          const notice = encoding.createEncoder();
+          encoding.writeVarUint(notice, MESSAGE_NOTICE);
+          encoding.writeVarUint(notice, err.closeCode);
+          ws.send(encoding.toUint8Array(notice));
           ws.close(err.closeCode, err.message);
         } else {
           console.warn(`room ${room.id}: dropping client after bad message`, err);
