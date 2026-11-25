@@ -234,16 +234,20 @@ describe("limits", () => {
   });
 
   test("a client that stops reading is disconnected", async () => {
-    const server = await start({ limits: { bufferedBytes: 200_000 } });
+    // Only the slow reader may hit a limit here.
+    const plenty = { capacity: Infinity, perSecond: 0 };
+    const server = await start({
+      limits: { bufferedBytes: 200_000, userBytes: plenty, docBytes: 1e9, docBytesHard: 1e9 },
+    });
     const { ws } = await rawSocket(server, "slowreader", "slow");
     (ws as unknown as { _socket: net.Socket })._socket.pause();
     const ada = await client(server, "slowreader", "ada", "Ada");
     const connections = () => server.collab.rooms.get("slowreader")?.connectionCount;
     expect(connections()).toBe(2);
     // Enough to fill the operating system's own socket buffers first.
-    for (let i = 0; i < 60 && connections() === 2; i++) {
-      ada.text.insert(0, "y".repeat(50_000));
-      ada.text.delete(0, 50_000);
+    for (let i = 0; i < 400 && connections() === 2; i++) {
+      ada.text.insert(0, "y".repeat(100_000));
+      ada.text.delete(0, 100_000);
       await settle(5);
     }
     await waitFor(() => connections() === 1, "the slow reader to be dropped");
